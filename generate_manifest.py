@@ -16,6 +16,11 @@ Manifest fields:
 - title: Human-readable title of the package
 - description: Brief description of what the package does
 - version: Version number (semver format)
+- status: Package maturity level (manually maintained)
+  - "development": Work in progress, not ready for users
+  - "experimental": Usable, but expect breaking changes
+  - "stable": Production-ready, safe to depend on
+  - "deprecated": No longer maintained, migrate away
 - namespace: Naming prefix for all contributions (e.g. user.my_package)
 - github: GitHub repository URL
 - preview: Preview image URL
@@ -270,7 +275,7 @@ def scan_all_manifests(talon_root: str) -> dict:
                     manifest = json.load(f)
 
                 # Only index manifests from our generator
-                if manifest.get('_generator') != 'manifest_builder':
+                if manifest.get('_generator') != 'talon-manifest-builder':
                     continue
 
                 manifest_count += 1
@@ -462,14 +467,13 @@ def create_or_update_manifest() -> None:
             break
         talon_user_dir = parent
 
-    # Scan for all manifests in user directory to build dependency index
-    print("Scanning for package manifests...")
-    entity_to_package, manifest_count = scan_all_manifests(talon_user_dir)
-    print(f"  Found {manifest_count} packages\n")
-
     if not os.path.exists(root_path):
         print(f"Error: Packages directory not found at {root_path}")
         return
+
+    # Defer manifest scanning until we know if any package has dependencies
+    entity_to_package = None
+    manifest_count = 0
 
     for relative_dir in CREATE_MANIFEST_DIRS:
         full_package_dir = os.path.abspath(os.path.join(root_path, relative_dir))
@@ -520,27 +524,67 @@ def create_or_update_manifest() -> None:
             if namespace:
                 validate_namespace(namespace, new_entity_data.contributes)
 
-            # Resolve package dependencies
-            package_dependencies = resolve_package_dependencies(new_entity_data.depends, entity_to_package)
+            # Check if we need to resolve dependencies
+            has_dependencies = any([
+                new_entity_data.depends.actions,
+                new_entity_data.depends.settings,
+                new_entity_data.depends.tags,
+                new_entity_data.depends.lists,
+                new_entity_data.depends.modes,
+                new_entity_data.depends.scopes,
+                new_entity_data.depends.captures
+            ])
+
+            package_dependencies = {}
+            if has_dependencies:
+                # Lazy load: only scan manifests if we have dependencies to resolve
+                if entity_to_package is None:
+                    print("Scanning for package manifests (to resolve dependencies)...")
+                    entity_to_package, manifest_count = scan_all_manifests(talon_user_dir)
+                    print(f"  Found {manifest_count} packages in workspace\n")
+
+                # Resolve package dependencies
+                package_dependencies = resolve_package_dependencies(new_entity_data.depends, entity_to_package)
+
+                # Preserve manually specified versions from existing manifest
+                existing_deps = existing_manifest_data.get("dependencies", {})
+                for pkg_name in existing_deps:
+                    if pkg_name in package_dependencies:
+                        # Keep the manually specified version
+                        package_dependencies[pkg_name] = existing_deps[pkg_name]
+
+            # Track dependencies before filtering
+            all_resolved_deps = dict(package_dependencies)
 
             # Remove any dependencies that are in devDependencies
             existing_dev_deps = existing_manifest_data.get("devDependencies", {})
+            dev_deps_found = []
             for pkg_name in existing_dev_deps:
-                package_dependencies.pop(pkg_name, None)
+                if pkg_name in package_dependencies:
+                    dev_deps_found.append(pkg_name)
+                    package_dependencies.pop(pkg_name, None)
 
             if package_dependencies:
                 print(f"Package dependencies:")
                 for pkg_name, pkg_version in package_dependencies.items():
                     print(f"  ✓ {pkg_name} ({pkg_version})")
                 print()
+            elif dev_deps_found:
+                print(f"Package dependencies (covered by devDependencies):")
+                for pkg_name in dev_deps_found:
+                    print(f"  ✓ {pkg_name} ({existing_dev_deps[pkg_name]}) [devDependency]")
+                print()
+            elif not has_dependencies:
+                print(f"No package dependencies\n")
             else:
-                print(f"No package dependencies found\n")
+                print(f"Dependencies found but unable to resolve to packages\n")
 
             new_manifest_data = {
                 "name": existing_manifest_data.get("name", os.path.basename(full_package_dir)),
                 "title": existing_manifest_data.get("title", ""),
                 "description": existing_manifest_data.get("description", "Add a description of your Talon package here." if is_new_manifest else "Auto-generated manifest."),
                 "version": existing_manifest_data.get("version", "0.1.0"),
+                "status": existing_manifest_data.get("status", "development"),
                 "namespace": namespace,
                 "github": existing_manifest_data.get("github", ""),
                 "preview": existing_manifest_data.get("preview", ""),
@@ -550,7 +594,7 @@ def create_or_update_manifest() -> None:
                 "devDependencies": existing_manifest_data.get("devDependencies", {}),
                 "contributes": vars(new_entity_data.contributes),
                 "depends": vars(new_entity_data.depends),
-                "_generator": "manifest_builder",
+                "_generator": "talon-manifest-builder",
                 "_generatorVersion": get_generator_version()
             }
 
