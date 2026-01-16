@@ -1,6 +1,6 @@
 # Manifest Tools for Talon
 
-Generate a manifest.json and _version.py for your Talon repo which includes talon dependencies, contributions, versioning, and dependency checking.
+Generate a `manifest.json` and `_version.py` for your Talon package (folder) which includes Talon dependencies, contributions, versioning, and dependency checking.
 
 Also includes a script for generating installation instructions.
 
