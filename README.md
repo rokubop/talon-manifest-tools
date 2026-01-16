@@ -20,7 +20,7 @@ git clone https://github.com/rokubop/manifest_builder
 
 ## Usage
 ```bash
-cd talon-manifest-builder
+cd talon-manifest-tools
 
 # Primary script
 python generate_manifest.py ../talon-package # generates or updates ../talon-package/manifest.json
@@ -71,7 +71,11 @@ Parses Python files using AST to detect Talon actions, settings, tags, lists, mo
   "author": "Your Name",
   "tags": ["productivity", "editing"],
   "dependencies": {
-    "talon-ui-elements": "0.10.0"
+    "talon-ui-elements": {
+      "version": "0.10.0",
+      "namespace": "user.ui_elements",
+      "github": "https://github.com/user/talon-ui-elements"
+    }
   },
   "devDependencies": {},
   "contributes": {
@@ -81,8 +85,8 @@ Parses Python files using AST to detect Talon actions, settings, tags, lists, mo
   "depends": {
     "actions": ["user.ui_elements_show"]
   },
-  "_generator": "talon-manifest-builder",
-  "_generatorVersion": "1.1.0"
+  "_generator": "talon-manifest-tools",
+  "_generatorVersion": "2.0.0"
 }
 ```
 
@@ -94,17 +98,17 @@ Parses Python files using AST to detect Talon actions, settings, tags, lists, mo
 | title | Human-readable package title. Recommendation: "Title Case" format |
 | description | Brief description of package functionality |
 | version | Semantic version number (Major.Minor.Patch) |
-| namespace | Naming prefix for all package contributions (e.g. `user.ui_elements` means all actions should be `user.ui_elements_*`) |
+| namespace | Naming prefix for all talon actions in this package (e.g. `user.ui_elements` means all actions in this package are `user.ui_elements_*`) |
 | github | GitHub repository URL |
 | preview | Preview image URL |
 | author | Package author name |
-| status | Recommended values: "development" (not ready for users), "experimental" (usable but expect breaking changes), "stable" (production-ready), "deprecated" (no longer maintained) |
-| tags | Category tags for the package |
-| dependencies | Required packages with minimum versions (auto-generated, e.g. "0.10.0" means requires 0.10.0 or higher). Once set, versions are preserved - update manually if needed. |
+| status | Recommended values: "development" (WIP - not ready for users), "experimental" (usable but expect minor bugs or breaking changes later), "stable" (production-ready), "inactive" (no longer maintained) |
+| tags | Arbitrary category tags for the package |
+| dependencies | Required packages as dict mapping package name to object with `version` (minimum version required, e.g. "0.10.0" means 0.10.0 or higher), `namespace`, and `github` fields. Auto-generated, but once set, versions are preserved - update manually if needed. |
 | devDependencies | Dev-only dependencies (manually move items here from `dependencies` if only needed for testing/development) |
 | contributes | Actions/settings/etc. this package provides (auto-generated) |
 | depends | Actions/settings/etc. this package uses (auto-generated) |
-| _generator | Tool that generated this manifest e.g. "talon-manifest-builder" |
+| _generator | Tool that generated this manifest e.g. "talon-manifest-tools" |
 | _generatorVersion | Version of the generator tool |
 
 Most fields are preserved across regenerations, but `contributes`, `depends`, and `dependencies` are auto-generated each time.

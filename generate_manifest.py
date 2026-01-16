@@ -26,12 +26,16 @@ Manifest fields:
 - preview: Preview image URL
 - author: Package author name
 - tags: Category tags for the package
+- dependencyCheck: Whether to validate dependencies at runtime (default: true)
+  - true: Print errors on startup if dependencies not met
+  - false: Skip dependency validation
 - dependencies: Required packages with versions (auto-generated)
 - devDependencies: Dev-only dependencies (manually maintained)
 - contributes: Actions/settings/tags/lists/modes/scopes/captures this package provides (auto-generated)
 - depends: Actions/settings/etc. this package uses (auto-generated)
 - _generator: Tool that generated this manifest (auto-added)
 - _generatorVersion: Version of the generator tool (auto-added)
+- _generatorRequireVersionAction: Whether generator should require version action (auto-added)
 """
 
 def get_generator_version() -> str:
@@ -275,12 +279,14 @@ def scan_all_manifests(talon_root: str) -> dict:
                     manifest = json.load(f)
 
                 # Only index manifests from our generator
-                if manifest.get('_generator') != 'talon-manifest-builder':
+                if manifest.get('_generator') != 'talon-manifest-tools':
                     continue
 
                 manifest_count += 1
                 package_name = manifest.get('name')
                 package_version = manifest.get('version', '0.0.0')
+                package_namespace = manifest.get('namespace', '')
+                package_github = manifest.get('github', '')
 
                 if not package_name:
                     continue
@@ -292,7 +298,9 @@ def scan_all_manifests(talon_root: str) -> dict:
                     for entity in entities:
                         entity_to_package[entity] = {
                             'package': package_name,
-                            'version': package_version
+                            'version': package_version,
+                            'namespace': package_namespace,
+                            'github': package_github
                         }
             except Exception as e:
                 # Silently skip malformed manifests
@@ -303,7 +311,7 @@ def scan_all_manifests(talon_root: str) -> dict:
 def resolve_package_dependencies(depends: Entities, entity_to_package: dict) -> dict:
     """
     Resolve package dependencies from entity dependencies.
-    Returns a dict of package names to versions.
+    Returns a dict of package names to {version, namespace, github}.
     """
     package_deps = {}
 
@@ -314,11 +322,19 @@ def resolve_package_dependencies(depends: Entities, entity_to_package: dict) -> 
                 pkg_info = entity_to_package[entity]
                 pkg_name = pkg_info['package']
                 pkg_version = pkg_info['version']
+                pkg_namespace = pkg_info['namespace']
+                pkg_github = pkg_info.get('github', '')
 
                 # If we already have this package, keep existing version
                 # (in case multiple entities from same package)
                 if pkg_name not in package_deps:
-                    package_deps[pkg_name] = pkg_version
+                    dep_info = {
+                        'version': pkg_version,
+                        'namespace': pkg_namespace
+                    }
+                    if pkg_github:
+                        dep_info['github'] = pkg_github
+                    package_deps[pkg_name] = dep_info
 
     return dict(sorted(package_deps.items()))
 
@@ -412,6 +428,39 @@ def validate_namespace(namespace: str, contributes: Entities) -> None:
         for warning in warnings:
             print(warning)
         print()
+
+def check_version_action(namespace: str, contributes: Entities, version_check: bool, package_name: str, package_dir: str) -> None:
+    """
+    Check if package provides a version action.
+
+    Args:
+        namespace: Package namespace (e.g., 'user.my_package')
+        contributes: Contributed entities
+        version_check: True to error if missing, False to skip check
+        package_name: Name of the package
+        package_dir: Absolute path to package directory
+    """
+    if not version_check:
+        return
+
+    # Strip 'user.' prefix to get base namespace
+    namespace_base = namespace[5:] if namespace.startswith('user.') else namespace
+    expected_action = f"user.{namespace_base}_version"
+
+    has_version_action = expected_action in contributes.actions
+
+    if not has_version_action:
+        # Check if _version.py file exists
+        version_file = os.path.join(package_dir, '_version.py')
+        if not os.path.exists(version_file):
+            print(f"\nERROR: Missing required version action '{expected_action}'")
+            print(f"   Run: python generate_version.py {package_name}")
+            print(f"   Or set \"_generatorRequireVersionAction\": false in manifest.json to skip this check")
+            print()
+        else:
+            print(f"\nWARNING: _version.py exists but action '{expected_action}' not detected")
+            print(f"   The file may need to be regenerated or Talon needs to be reloaded")
+            print()
 
 def update_manifest(package_dir: str, manifest_data) -> None:
     manifest_path = os.path.join(package_dir, 'manifest.json')
@@ -524,6 +573,11 @@ def create_or_update_manifest() -> None:
             if namespace:
                 validate_namespace(namespace, new_entity_data.contributes)
 
+            # Check version action
+            version_check = existing_manifest_data.get("_generatorRequireVersionAction", True)
+            if namespace:  # Only check if package has a namespace
+                check_version_action(namespace, new_entity_data.contributes, version_check, package_name, full_package_dir)
+
             # Check if we need to resolve dependencies
             has_dependencies = any([
                 new_entity_data.depends.actions,
@@ -546,12 +600,19 @@ def create_or_update_manifest() -> None:
                 # Resolve package dependencies
                 package_dependencies = resolve_package_dependencies(new_entity_data.depends, entity_to_package)
 
-                # Preserve manually specified versions from existing manifest
+                # Preserve manually specified versions and github URLs from existing manifest
                 existing_deps = existing_manifest_data.get("dependencies", {})
                 for pkg_name in existing_deps:
                     if pkg_name in package_dependencies:
-                        # Keep the manually specified version
-                        package_dependencies[pkg_name] = existing_deps[pkg_name]
+                        # Handle both old (string) and new (dict) formats
+                        if isinstance(existing_deps[pkg_name], str):
+                            package_dependencies[pkg_name]['version'] = existing_deps[pkg_name]
+                        else:
+                            if 'version' in existing_deps[pkg_name]:
+                                package_dependencies[pkg_name]['version'] = existing_deps[pkg_name]['version']
+                            # Preserve github URL if it exists in the existing manifest
+                            if 'github' in existing_deps[pkg_name]:
+                                package_dependencies[pkg_name]['github'] = existing_deps[pkg_name]['github']
 
             # Track dependencies before filtering
             all_resolved_deps = dict(package_dependencies)
@@ -566,18 +627,18 @@ def create_or_update_manifest() -> None:
 
             if package_dependencies:
                 print(f"Package dependencies:")
-                for pkg_name, pkg_version in package_dependencies.items():
-                    print(f"  ✓ {pkg_name} ({pkg_version})")
+                for pkg_name, pkg_info in package_dependencies.items():
+                    print(f"  ✓ {pkg_name} ({pkg_info['version']})")
                 print()
             elif dev_deps_found:
                 print(f"Package dependencies (covered by devDependencies):")
                 for pkg_name in dev_deps_found:
-                    print(f"  ✓ {pkg_name} ({existing_dev_deps[pkg_name]}) [devDependency]")
+                    dev_dep_info = existing_dev_deps[pkg_name]
+                    version = dev_dep_info.get('version', 'unknown') if isinstance(dev_dep_info, dict) else dev_dep_info
+                    print(f"  ✓ {pkg_name} ({version}) [devDependency]")
                 print()
-            elif not has_dependencies:
-                print(f"No package dependencies\n")
             else:
-                print(f"Dependencies found but unable to resolve to packages\n")
+                print(f"No package dependencies\n")
 
             new_manifest_data = {
                 "name": existing_manifest_data.get("name", os.path.basename(full_package_dir)),
@@ -590,18 +651,44 @@ def create_or_update_manifest() -> None:
                 "preview": existing_manifest_data.get("preview", ""),
                 "author": existing_manifest_data.get("author", ""),
                 "tags": existing_manifest_data.get("tags", []),
+            }
+
+            # Only include dependencyCheck if user explicitly set it or there are dependencies
+            if "dependencyCheck" in existing_manifest_data:
+                new_manifest_data["dependencyCheck"] = existing_manifest_data["dependencyCheck"]
+            elif package_dependencies:
+                new_manifest_data["dependencyCheck"] = True
+
+            new_manifest_data.update({
                 "dependencies": package_dependencies,
                 "devDependencies": existing_manifest_data.get("devDependencies", {}),
                 "contributes": vars(new_entity_data.contributes),
                 "depends": vars(new_entity_data.depends),
-                "_generator": "talon-manifest-builder",
-                "_generatorVersion": get_generator_version()
-            }
+                "_generator": "talon-manifest-tools",
+                "_generatorVersion": get_generator_version(),
+                "_generatorRequireVersionAction": existing_manifest_data.get("_generatorRequireVersionAction", True)
+            })
 
             new_manifest_data = prune_manifest_data(new_manifest_data)
             update_manifest(full_package_dir, new_manifest_data)
             manifest_path = os.path.join(full_package_dir, 'manifest.json')
             print(f"Manifest updated: {manifest_path}")
+
+            # Check if _version.py needs updating
+            version_file_path = os.path.join(full_package_dir, '_version.py')
+            if os.path.exists(version_file_path):
+                try:
+                    with open(version_file_path, 'r', encoding='utf-8') as f:
+                        first_lines = f.read(200)
+                        if 'talon-manifest-tools v' in first_lines:
+                            existing_version = first_lines.split('v')[1].split('"')[0].split('\n')[0].strip()
+                            current_version = get_generator_version()
+                            if existing_version != current_version:
+                                rel_path = os.path.relpath(full_package_dir)
+                                print(f"⚠ _version.py is outdated (v{existing_version})")
+                                print(f"  Run: py generate_version.py {rel_path}")
+                except:
+                    pass
 
 if __name__ == "__main__":
     create_or_update_manifest()
