@@ -394,29 +394,35 @@ def infer_namespace_from_package_name(package_name: str) -> str:
     namespace = ''.join(c for c in namespace if c.isalnum() or c == '_')
     return namespace.lower()
 
-def validate_namespace(namespace: str, contributes: Entities) -> None:
+def validate_namespace(namespace: str, contributes: Entities) -> int:
     """
-    Validate that contributed entities match the package namespace.
+    Validates that contributed entities match the expected namespace pattern.
+    Prints warnings for any entities that don't follow the pattern.
 
-    Warns if entities don't follow the user.<namespace>_* convention.
-    """
-def validate_namespace(namespace: str, contributes: Entities) -> None:
-    """
-    Validate that contributed entities match the package namespace.
-    Warns if entities don't follow the user.<namespace>_* convention.
+    Expected pattern: namespace or namespace_*
+    Example: If namespace is 'user.my_package', all entities should be:
+    - user.my_package (exact match), or
+    - user.my_package_something (prefixed)
+
+    Returns:
+        Number of warnings found
     """
     warnings = []
 
-    # Strip 'user.' from namespace for comparison if present
+    # Strip 'user.' prefix for comparison
     namespace_base = namespace[5:] if namespace.startswith('user.') else namespace
 
     for entity_type in ENTITIES:
         entities = getattr(contributes, entity_type)
         for entity in entities:
-            # Check if entity starts with 'user.'
-            if entity.startswith('user.'):
-                # Extract the part after 'user.'
-                entity_suffix = entity[5:]  # Remove 'user.'
+            # Only check user.* entities
+            if not entity.startswith('user.'):
+                continue
+
+            entity_suffix = entity[5:]  # Remove 'user.' prefix
+
+            # Check if entity matches expected pattern
+            if entity_suffix:
                 # Allow exact match or prefix with underscore
                 # Valid: user.mouse_rig or user.mouse_rig_something
                 # Invalid: user.other_thing
@@ -429,7 +435,9 @@ def validate_namespace(namespace: str, contributes: Entities) -> None:
             print(warning)
         print()
 
-def check_version_action(namespace: str, contributes: Entities, version_check: bool, package_name: str, package_dir: str) -> None:
+    return len(warnings)
+
+def check_version_action(namespace: str, contributes: Entities, version_check: bool, package_name: str, package_dir: str) -> int:
     """
     Check if package provides a version action.
 
@@ -439,9 +447,12 @@ def check_version_action(namespace: str, contributes: Entities, version_check: b
         version_check: True to error if missing, False to skip check
         package_name: Name of the package
         package_dir: Absolute path to package directory
+
+    Returns:
+        Number of errors found (0 or 1)
     """
     if not version_check:
-        return
+        return 0
 
     # Strip 'user.' prefix to get base namespace
     namespace_base = namespace[5:] if namespace.startswith('user.') else namespace
@@ -457,10 +468,14 @@ def check_version_action(namespace: str, contributes: Entities, version_check: b
             print(f"   Run: python generate_version.py {package_name}")
             print(f"   Or set \"_generatorRequireVersionAction\": false in manifest.json to skip this check")
             print()
+            return 1
         else:
             print(f"\nWARNING: _version.py exists but action '{expected_action}' not detected")
             print(f"   The file may need to be regenerated or Talon needs to be reloaded")
             print()
+            return 0
+
+    return 0
 
 def update_manifest(package_dir: str, manifest_data) -> None:
     manifest_path = os.path.join(package_dir, 'manifest.json')
@@ -523,6 +538,8 @@ def create_or_update_manifest() -> None:
     # Defer manifest scanning until we know if any package has dependencies
     entity_to_package = None
     manifest_count = 0
+    total_warnings = 0
+    total_errors = 0
 
     for relative_dir in CREATE_MANIFEST_DIRS:
         full_package_dir = os.path.abspath(os.path.join(root_path, relative_dir))
@@ -571,12 +588,12 @@ def create_or_update_manifest() -> None:
 
             # Validate namespace only if there are contributions
             if namespace:
-                validate_namespace(namespace, new_entity_data.contributes)
+                total_warnings += validate_namespace(namespace, new_entity_data.contributes)
 
             # Check version action
             version_check = existing_manifest_data.get("_generatorRequireVersionAction", True)
             if namespace:  # Only check if package has a namespace
-                check_version_action(namespace, new_entity_data.contributes, version_check, package_name, full_package_dir)
+                total_errors += check_version_action(namespace, new_entity_data.contributes, version_check, package_name, full_package_dir)
 
             # Check if we need to resolve dependencies
             has_dependencies = any([
@@ -640,9 +657,18 @@ def create_or_update_manifest() -> None:
             else:
                 print(f"No package dependencies\n")
 
+            # Generate title from package name if this is a new manifest
+            default_title = ""
+            if is_new_manifest:
+                pkg_name = existing_manifest_data.get("name", os.path.basename(full_package_dir))
+                # Remove 'talon-' prefix if present
+                title_base = pkg_name.replace('talon-', '').replace('talon_', '')
+                # Convert to Title Case: hyphens/underscores to spaces, capitalize words
+                default_title = title_base.replace('-', ' ').replace('_', ' ').title()
+
             new_manifest_data = {
                 "name": existing_manifest_data.get("name", os.path.basename(full_package_dir)),
-                "title": existing_manifest_data.get("title", ""),
+                "title": existing_manifest_data.get("title", default_title),
                 "description": existing_manifest_data.get("description", "Add a description of your Talon package here." if is_new_manifest else "Auto-generated manifest."),
                 "version": existing_manifest_data.get("version", "0.1.0"),
                 "status": existing_manifest_data.get("status", "development"),
@@ -659,6 +685,11 @@ def create_or_update_manifest() -> None:
             elif package_dependencies:
                 new_manifest_data["dependencyCheck"] = True
 
+            # Determine default for _generatorRequireVersionAction
+            # If no namespace or this is a new manifest with no namespace, default to False
+            # Otherwise preserve existing value or default to True
+            default_require_version = bool(namespace) if is_new_manifest else True
+
             new_manifest_data.update({
                 "dependencies": package_dependencies,
                 "devDependencies": existing_manifest_data.get("devDependencies", {}),
@@ -666,7 +697,7 @@ def create_or_update_manifest() -> None:
                 "depends": vars(new_entity_data.depends),
                 "_generator": "talon-manifest-tools",
                 "_generatorVersion": get_generator_version(),
-                "_generatorRequireVersionAction": existing_manifest_data.get("_generatorRequireVersionAction", True)
+                "_generatorRequireVersionAction": existing_manifest_data.get("_generatorRequireVersionAction", default_require_version)
             })
 
             new_manifest_data = prune_manifest_data(new_manifest_data)
@@ -689,6 +720,16 @@ def create_or_update_manifest() -> None:
                                 print(f"  Run: py generate_version.py {rel_path}")
                 except:
                     pass
+
+    # Print summary
+    if total_warnings > 0 or total_errors > 0:
+        print(f"\n{'='*60}")
+        print("Summary:")
+        if total_warnings > 0:
+            print(f"  {total_warnings} warning(s)")
+        if total_errors > 0:
+            print(f"  {total_errors} error(s)")
+        print(f"{'='*60}")
 
 if __name__ == "__main__":
     create_or_update_manifest()
