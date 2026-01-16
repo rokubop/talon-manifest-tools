@@ -83,7 +83,7 @@ python generate_install_block.py ../talon-package
 | title | Human-readable package title. Recommendation: "Title Case" format |
 | description | Brief description of package functionality |
 | version | Semantic version number (Major.Minor.Patch) |
-| namespace | Naming prefix for all talon actions in this package (e.g. `user.ui_elements` means all actions in this package are `user.ui_elements_*`) |
+| namespace | Naming prefix for all talon actions in this package (e.g. `user.ui_elements` means all actions in this package are `user.ui_elements_*`). Best practice: all your actions should use the same namespace - you'll get warnings if they don't. |
 | github | GitHub repository URL |
 | preview | Preview image URL |
 | author | Package author name |
