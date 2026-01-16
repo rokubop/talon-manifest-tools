@@ -69,6 +69,7 @@ def generate_version_action(package_dir: str, force: bool = False) -> None:
     package_name = manifest.get('name', os.path.basename(full_package_dir))
     generator_version = get_generator_version()
     has_dependencies = bool(manifest.get('dependencies'))
+    dependency_check = manifest.get('dependencyCheck', True)
 
     # Check if file already exists and compare versions
     version_file_path = os.path.join(full_package_dir, '_version.py')
@@ -95,10 +96,10 @@ def generate_version_action(package_dir: str, force: bool = False) -> None:
 
     # Generate the version action file
     description_parts = [f"- Package version checking via {action_name}_version() action"]
-    if has_dependencies:
+    if has_dependencies and dependency_check:
         description_parts.append("- Automatic dependency validation on startup")
 
-    talon_imports = "Module, actions, app" if has_dependencies else "Module"
+    talon_imports = "Module, actions, app" if (has_dependencies and dependency_check) else "Module"
 
     version_file_content = f'''"""
 DO NOT EDIT - Auto-generated file
@@ -123,12 +124,15 @@ class Actions:
         return tuple(map(int, version_str.split('.')))
 '''
 
-    if has_dependencies:
+    if has_dependencies and dependency_check:
         version_file_content += f'''
 def validate_dependencies():
     try:
         with open(os.path.join(os.path.dirname(__file__), 'manifest.json'), 'r') as f:
             data = json.load(f)
+
+        if not data.get('dependencyCheck', True):
+            return
 
         deps = data.get('dependencies', {{}})
         errors = []
