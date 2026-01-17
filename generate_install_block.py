@@ -53,7 +53,7 @@ def generate_installation_instructions(package_dir: str):
         for dep_name, dep_info in dependencies.items():
             version = dep_info.get('version', 'unknown')
             github = dep_info.get('github', '')
-            
+
             if github:
                 print(f"- **{dep_name}** (v{version}+)")
                 print(f"  ```sh")
@@ -71,7 +71,7 @@ def generate_installation_instructions(package_dir: str):
         for dep_name, dep_info in dev_dependencies.items():
             version = dep_info.get('version', 'unknown')
             github = dep_info.get('github', '')
-            
+
             if github:
                 print(f"- **{dep_name}** (v{version}+)")
                 print(f"  ```sh")
@@ -91,6 +91,11 @@ if __name__ == "__main__":
         print("Usage: python generate_installation.py <package_directory>")
         print("Example: python generate_installation.py ../my-package")
         sys.exit(1)
+
+    if len(sys.argv) > 2:
+        print("Warning: Multiple packages provided, but only one is supported.")
+        print("Processing only the first package: " + sys.argv[1])
+        print()
 
     package_dir = sys.argv[1]
     generate_installation_instructions(package_dir)
