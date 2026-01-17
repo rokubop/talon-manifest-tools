@@ -148,7 +148,10 @@ def validate_dependencies():
             version_action = f"{{info['namespace']}}_version"
             github_url = info.get('github', '')
             try:
-                installed = getattr(actions, version_action)()
+                action_ref = actions
+                for part in version_action.split('.'):
+                    action_ref = getattr(action_ref, part)
+                installed = action_ref()
                 required = tuple(int(x) for x in info['version'].split('.'))
                 if installed < required:
                     installed_str = '.'.join(map(str, installed))
@@ -170,6 +173,7 @@ def validate_dependencies():
                 print(error)
             print("  WARNING: Review code from unfamiliar sources before installing")
             print("  Note: Restart Talon after updating dependencies")
+            print(f"  To disable these warnings, set 'validateDependencies': false in {{data.get('name')}}/manifest.json")
             print()
     except:
         pass
