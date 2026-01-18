@@ -1,10 +1,104 @@
-"""Generate installation instructions for a Talon package"""
+"""Generate installation instructions for a Talon repo"""
 import json
 import os
 import sys
 
+def generate_installation_markdown(manifest: dict) -> str:
+    """Generate installation section markdown from manifest data."""
+    github_url = manifest.get('github', '')
+    dependencies = manifest.get('dependencies', {})
+    dev_dependencies = manifest.get('devDependencies', {})
+    requires_talon_beta = manifest.get('requiresTalonBeta', False)
+
+    lines = ["## Installation"]
+
+    # Dependencies section
+    if requires_talon_beta or dependencies:
+        lines.append("\n### Dependencies")
+        lines.append("\nThis repo requires:")
+
+        # Talon Beta requirement first
+        if requires_talon_beta:
+            lines.append("- [**Talon Beta**](https://talon.wiki/Help/beta_talon/)")
+
+        for dep_name, dep_info in dependencies.items():
+            version = dep_info.get('version', 'unknown')
+            github = dep_info.get('github', '')
+            if github:
+                lines.append(f"- [**{dep_name}**]({github}) (v{version}+)")
+            else:
+                lines.append(f"- **{dep_name}** (v{version}+)")
+
+    # Dev dependencies section
+    if dev_dependencies:
+        lines.append("\n### Development Dependencies")
+        lines.append("\nOptional dependencies for development and testing:")
+
+        for dep_name, dep_info in dev_dependencies.items():
+            version = dep_info.get('version', 'unknown')
+            github = dep_info.get('github', '')
+            if github:
+                lines.append(f"- [**{dep_name}**]({github}) (v{version}+)")
+            else:
+                lines.append(f"- **{dep_name}** (v{version}+)")
+
+    # Install section
+    if requires_talon_beta or dependencies or dev_dependencies:
+        lines.append("\n### Install")
+
+    if requires_talon_beta or dependencies:
+        lines.append("\nClone the dependencies and this repo into your [Talon](https://talonvoice.com/) user directory:")
+    else:
+        lines.append("\nClone this repo into your [Talon](https://talonvoice.com/) user directory:")
+
+    lines.append("\n```sh")
+    lines.append("# mac and linux")
+    lines.append("cd ~/.talon/user")
+    lines.append("")
+    lines.append("# windows")
+    lines.append("cd ~/AppData/Roaming/talon/user")
+
+    # Dependencies clones
+    if dependencies:
+        lines.append("")
+        lines.append("# Dependencies")
+        for dep_name, dep_info in dependencies.items():
+            github = dep_info.get('github', '')
+            if github:
+                lines.append(f"git clone {github}")
+
+    # This repo
+    if dependencies or dev_dependencies:
+        lines.append("")
+        lines.append("# This repo")
+    else:
+        lines.append("")
+    if github_url:
+        lines.append(f"git clone {github_url}")
+    else:
+        lines.append("git clone <github_url>  # Add github URL to manifest.json")
+
+    # Dev dependencies clones (after main repo since they're optional)
+    if dev_dependencies:
+        lines.append("")
+        lines.append("# Dev Dependencies (optional)")
+        for dep_name, dep_info in dev_dependencies.items():
+            github = dep_info.get('github', '')
+            if github:
+                lines.append(f"git clone {github}")
+
+    lines.append("```")
+
+    # Note
+    if dependencies or dev_dependencies:
+        lines.append("\n> **Note**: Review code from unfamiliar sources before installing.")
+        lines.append("> Restart Talon after installing dependencies.")
+
+    return "\n".join(lines)
+
+
 def generate_installation_instructions(package_dir: str):
-    """Generate installation instructions from manifest.json"""
+    """Generate installation instructions from manifest.json and print them."""
     full_package_dir = os.path.abspath(package_dir)
 
     if not os.path.isdir(full_package_dir):
@@ -21,80 +115,23 @@ def generate_installation_instructions(package_dir: str):
     with open(manifest_path, 'r', encoding='utf-8') as f:
         manifest = json.load(f)
 
-    name = manifest.get('name', os.path.basename(full_package_dir))
-    github_url = manifest.get('github', '')
-    dependencies = manifest.get('dependencies', {})
+    installation_md = generate_installation_markdown(manifest)
 
     print("\n" + "=" * 60)
     print("Installation Instructions (copy to README.md)")
     print("=" * 60)
-    print("\n## Installation")
-    print("\nClone this repository into your Talon user directory:\n")
-    print("```sh")
-    print("# mac and linux")
-    print("cd ~/.talon/user")
-    print("")
-    print("# windows")
-    print("cd ~/AppData/Roaming/talon/user")
-    print("")
-
-    if github_url:
-        print(f"git clone {github_url}")
-    else:
-        print(f"git clone <github_url>  # Add github URL to manifest.json")
-
-    print("```")
-
-    # Handle runtime dependencies
-    if dependencies:
-        print("\n### Dependencies\n")
-        print("This package requires the following dependencies:\n")
-
-        for dep_name, dep_info in dependencies.items():
-            version = dep_info.get('version', 'unknown')
-            github = dep_info.get('github', '')
-
-            if github:
-                print(f"- **{dep_name}** (v{version}+)")
-                print(f"  ```sh")
-                print(f"  git clone {github}")
-                print(f"  ```")
-            else:
-                print(f"- **{dep_name}** (v{version}+)")
-
-    # Handle development dependencies
-    dev_dependencies = manifest.get('devDependencies', {})
-    if dev_dependencies:
-        print("\n### Development Dependencies\n")
-        print("Optional dependencies for development and testing:\n")
-
-        for dep_name, dep_info in dev_dependencies.items():
-            version = dep_info.get('version', 'unknown')
-            github = dep_info.get('github', '')
-
-            if github:
-                print(f"- **{dep_name}** (v{version}+)")
-                print(f"  ```sh")
-                print(f"  git clone {github}")
-                print(f"  ```")
-            else:
-                print(f"- **{dep_name}** (v{version}+)")
-
-    if dependencies or dev_dependencies:
-        print("\n> **Note**: Review code from unfamiliar sources before installing.")
-        print("> Restart Talon after installing dependencies.")
-
-    print("\n" + "=" * 60 + "\n")
+    print(installation_md)
+    print("=" * 60 + "\n")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python generate_installation.py <package_directory>")
-        print("Example: python generate_installation.py ../my-package")
+        print("Usage: python generate_install_block.py <directory>")
+        print("Example: python generate_install_block.py ../my-repo")
         sys.exit(1)
 
     if len(sys.argv) > 2:
-        print("Warning: Multiple packages provided, but only one is supported.")
-        print("Processing only the first package: " + sys.argv[1])
+        print("Warning: Multiple directories provided, but only one is supported.")
+        print("Processing only the first: " + sys.argv[1])
         print()
 
     package_dir = sys.argv[1]

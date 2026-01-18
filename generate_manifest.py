@@ -15,11 +15,14 @@ Manifest fields:
 - title: Human-readable title of the package
 - description: Brief description of what the package does
 - version: Version number (semver format)
-- status: Package maturity level (manually maintained)
-  - "development": Work in progress, not ready for users
-  - "experimental": Usable, but expect breaking changes
+- status: Package status/category (manually maintained). Can be any value, but these get automatic shield colors:
+  - "reference": Personal config/examples, not meant to be used directly
+  - "prototype": Proof of concept, testing ideas
+  - "experimental": Early stage, expect rough edges
+  - "preview": Functional but still improving
   - "stable": Production-ready, safe to depend on
-  - "deprecated": No longer maintained, migrate away
+  - "deprecated": Stop using, migrate to alternative
+  - "archived": No longer maintained
 - namespace: Naming prefix for all contributions (e.g. user.my_package)
 - github: GitHub repository URL
 - preview: Preview image URL
@@ -741,7 +744,7 @@ def create_or_update_manifest() -> None:
                 "title": existing_manifest_data.get("title", default_title),
                 "description": existing_manifest_data.get("description", "Add a description of your Talon package here." if is_new_manifest else "Auto-generated manifest."),
                 "version": existing_manifest_data.get("version", "0.1.0"),
-                "status": existing_manifest_data.get("status", "development"),
+                "status": existing_manifest_data.get("status", "experimental"),
                 "namespace": namespace,
                 "github": existing_manifest_data.get("github", ""),
                 "preview": existing_manifest_data.get("preview", ""),
