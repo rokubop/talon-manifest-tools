@@ -10,12 +10,17 @@ import sys
 import subprocess
 from pathlib import Path
 
+# Get the directory where this script is located
+SCRIPT_DIR = Path(__file__).parent.resolve()
+
 
 def run_generator(script_name: str, directory: str) -> bool:
     """Run a generator script and return success status."""
     try:
+        # Build full path to the generator script
+        script_path = SCRIPT_DIR / script_name
         result = subprocess.run(
-            [sys.executable, script_name, directory],
+            [sys.executable, str(script_path), directory],
             capture_output=True,
             text=True,
             check=True

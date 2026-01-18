@@ -708,14 +708,14 @@ def create_or_update_manifest() -> None:
             if package_dependencies:
                 print(f"Package dependencies:")
                 for pkg_name, pkg_info in package_dependencies.items():
-                    print(f"  ✓ {pkg_name} ({pkg_info['version']})")
+                    print(f"  - {pkg_name} ({pkg_info['version']})")
                 print()
             elif dev_deps_found:
                 print(f"Package dependencies (covered by devDependencies):")
                 for pkg_name in dev_deps_found:
                     dev_dep_info = existing_dev_deps[pkg_name]
                     version = dev_dep_info.get('version', 'unknown') if isinstance(dev_dep_info, dict) else dev_dep_info
-                    print(f"  ✓ {pkg_name} ({version}) [devDependency]")
+                    print(f"  - {pkg_name} ({version}) [devDependency]")
                 print()
             else:
                 print(f"No package dependencies\n")
