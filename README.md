@@ -87,7 +87,7 @@ python generate_all.py ../talon-repo-1 ../talon-repo-2
   "tags": ["productivity", "editing"],
   "dependencies": {
     "talon-ui-elements": {
-      "version": "0.10.0",
+      "version": "0.13.0",
       "namespace": "user.ui_elements",
       "github": "https://github.com/user/talon-ui-elements"
     }
@@ -144,7 +144,6 @@ git clone https://github.com/rokubop/talon-ui-elements
 ```
 
 > **Note**: Review code from unfamiliar sources before installing.
-> Restart Talon after installing dependencies.
 ``````
 
 ## Example `_version.py` (no dependency check)
@@ -215,7 +214,6 @@ def validate_dependencies():
             for error in errors:
                 print(error)
             print("  WARNING: Review code from unfamiliar sources before installing")
-            print("  Note: Restart Talon after updating dependencies")
             print(f"  To disable these warnings, set 'validateDependencies': false in {data.get('name')}/manifest.json")
             print()
     except:
@@ -233,7 +231,6 @@ app.register("ready", validate_dependencies)
 2026-01-17 22:29:17.698    IO     Navigate to the talon-ui-elements directory and run: git pull
 2026-01-17 22:29:17.698    IO     https://github.com/rokubop/talon-ui-elements
 2026-01-17 22:29:17.698    IO   WARNING: Review code from unfamiliar sources before installing
-2026-01-17 22:29:17.698    IO   Note: Restart Talon after updating dependencies
 2026-01-17 22:29:17.698    IO   To disable these warnings, set 'validateDependencies': false in talon-face-tester/manifest.json
 ```
 

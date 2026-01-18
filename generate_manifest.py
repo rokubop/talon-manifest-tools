@@ -358,10 +358,11 @@ def scan_all_manifests(talon_root: str) -> dict:
 
     return entity_to_package, manifest_count
 
-def resolve_package_dependencies(depends: Entities, entity_to_package: dict) -> dict:
+def resolve_package_dependencies(depends: Entities, entity_to_package: dict, current_package: str = None) -> dict:
     """
     Resolve package dependencies from entity dependencies.
     Returns a dict of package names to {version, namespace, github}.
+    Excludes current_package to prevent self-dependencies.
     """
     package_deps = {}
 
@@ -374,6 +375,9 @@ def resolve_package_dependencies(depends: Entities, entity_to_package: dict) -> 
                 pkg_version = pkg_info['version']
                 pkg_namespace = pkg_info['namespace']
                 pkg_github = pkg_info.get('github', '')
+
+                if current_package and pkg_name == current_package:
+                    continue
 
                 # If we already have this package, keep existing version
                 # (in case multiple entities from same package)
@@ -677,8 +681,9 @@ def create_or_update_manifest() -> None:
                     entity_to_package, manifest_count = scan_all_manifests(talon_user_dir)
                     print(f"  Found {manifest_count} packages in workspace\n")
 
-                # Resolve package dependencies
-                package_dependencies = resolve_package_dependencies(new_entity_data.depends, entity_to_package)
+                # Resolve package dependencies (exclude current package to prevent self-dependency)
+                current_pkg_name = existing_manifest_data.get('name', package_name)
+                package_dependencies = resolve_package_dependencies(new_entity_data.depends, entity_to_package, current_pkg_name)
 
                 # Preserve manually specified versions and github URLs from existing manifest
                 existing_deps = existing_manifest_data.get("dependencies", {})

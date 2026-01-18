@@ -92,7 +92,6 @@ def generate_installation_markdown(manifest: dict) -> str:
     # Note
     if dependencies or dev_dependencies:
         lines.append("\n> **Note**: Review code from unfamiliar sources before installing.")
-        lines.append("> Restart Talon after installing dependencies.")
 
     return "\n".join(lines)
 

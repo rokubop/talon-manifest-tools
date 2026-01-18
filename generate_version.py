@@ -189,7 +189,6 @@ def validate_dependencies():
             for error in errors:
                 print(error)
             print("  WARNING: Review code from unfamiliar sources before installing")
-            print("  Note: Restart Talon after updating dependencies")
             print(f"  To disable these warnings, set 'validateDependencies': false in {{data.get('name')}}/manifest.json")
             print()
     except:
