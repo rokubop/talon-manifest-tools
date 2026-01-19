@@ -86,7 +86,7 @@ BUILTIN_ACTION_NAMESPACES = {
 # Built-in Talon tags that should not be added to dependencies
 # Sourced from: [tag for tag in registry.tags if not tag.startswith('user.')]
 BUILTIN_TAGS = {
-    "terminal"
+    "browser", "terminal"
 }
 
 # Built-in Talon modes that should not be added to dependencies
@@ -117,6 +117,20 @@ BUILTIN_CAPTURES = {
 BUILTIN_LISTS = {
     "digit", "letter", "modifier", "number_meta", "number_scale", "number_sign",
     "number_small", "special_key", "symbol"
+}
+
+TALON_BETA_DETECTION_PATTERNS = {
+    'talon_files': [
+        'parrot(',
+        'face(',
+        'deck(',
+    ],
+    'ctx_calls': [
+        'dynamic_list',
+    ],
+    'ctx_subscripts': [
+        "selections",
+    ],
 }
 
 def is_builtin_action(action_name: str) -> bool:
@@ -289,9 +303,11 @@ class EntityVisitor(ParentNodeVisitor):
     def visit_Call(self, node):
         try:
             if isinstance(node.func, ast.Attribute):
-                # Check for beta features: *.dynamic_list( (ctx, app_ctx, etc.)
-                if node.func.attr == 'dynamic_list' and isinstance(node.func.value, ast.Name):
-                    self.all_entities.requires_beta = True
+                # Check for beta features: ctx.dynamic_list(...), etc.
+                if node.func.attr in TALON_BETA_DETECTION_PATTERNS['ctx_calls'] and isinstance(node.func.value, ast.Name):
+                    var_name = node.func.value.id
+                    if 'ctx' in var_name.lower():
+                        self.all_entities.requires_beta = True
 
                 func_attr = node.func.attr
                 if func_attr in MOD_ATTR_CALLS:
@@ -340,8 +356,9 @@ class EntityVisitor(ParentNodeVisitor):
     def visit_Subscript(self, node):
         try:
             # Check for beta features: *ctx.selections[ (ctx, app_ctx, etc.)
+            # Uses TALON_BETA_DETECTION_PATTERNS['ctx_subscripts'] for detection
             # Only match if variable name contains 'ctx' to avoid false positives
-            if isinstance(node.value, ast.Attribute) and node.value.attr == 'selections':
+            if isinstance(node.value, ast.Attribute) and node.value.attr in TALON_BETA_DETECTION_PATTERNS['ctx_subscripts']:
                 if isinstance(node.value.value, ast.Name):
                     var_name = node.value.value.id
                     if 'ctx' in var_name.lower():
@@ -404,14 +421,12 @@ def detect_license(package_dir: str) -> str | None:
 def check_requires_talon_beta_in_talon_files(folder_path: str) -> bool:
     """
     Check if .talon files use beta features.
-    Detects: 'parrot(', 'face(', 'deck('
+    Uses patterns defined in TALON_BETA_DETECTION_PATTERNS['talon_files'] constant.
     (Python beta features are detected during AST parsing)
 
     Returns:
         True if beta features detected, False otherwise
     """
-    talon_beta_keywords = ['parrot(', 'face(', 'deck(']
-
     for root, _, files in os.walk(folder_path):
         for file in files:
             if file.endswith('.talon'):
@@ -419,8 +434,8 @@ def check_requires_talon_beta_in_talon_files(folder_path: str) -> bool:
                 try:
                     with open(file_path, 'r', encoding='utf-8') as f:
                         content_lower = f.read().lower()
-                        for keyword in talon_beta_keywords:
-                            if keyword in content_lower:
+                        for pattern in TALON_BETA_DETECTION_PATTERNS['talon_files']:
+                            if pattern in content_lower:
                                 return True
                 except Exception as e:
                     # Skip files that can't be read
