@@ -1,12 +1,11 @@
 """
 Generate shield badges from manifest.json.
 
-e.g., version, status, platform (optional), license (optional), requiresTalonBeta (only if true).
+e.g., version, status, platform (optional), license (optional).
 (version | 1.0.0)
 (status | stable)
 (platform | windows | mac | linux)
 (license | MIT)
-(talon beta | required)
 
 Usage:
   py generate_shields.py [directory]    # Generate shields for directory (default: current)

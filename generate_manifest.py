@@ -31,7 +31,7 @@ Manifest fields:
 - tags: Category tags for the package
 - platforms: Platform compatibility (manually added, optional). Array of platform names, e.g. ["windows", "mac", "linux"]
 - license: License type (auto-detected from LICENSE file on first run, manually editable, optional). Only included if LICENSE file exists or manually set
-- requiresTalonBeta: Whether package requires Talon beta - attempts to auto detect if this is not yet set (first run), otherwise preserves existing setting
+- requires: Hardware/software requirements (auto-detected). Possible values: "talonBeta", "eyeTracker", "parrot", "gamepad", "streamDeck", "webcam". Set _generatorUpdateRequires to false to preserve manual edits
 - validateDependencies: Whether to validate dependencies at runtime (default: true)
   - true: Print errors on startup if dependencies not met
   - false: Skip dependency validation
