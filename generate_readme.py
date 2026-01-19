@@ -15,21 +15,26 @@ from pathlib import Path
 
 def create_new_readme(manifest: dict, package_dir: Path) -> str:
     """Create a new README from scratch."""
-    from generate_shields import generate_shields
+    from generate_shields import generate_shields, should_generate_shields
     from generate_install_block import generate_installation_markdown
 
     title = manifest.get("title", manifest.get("name", "Talon Package"))
     description = manifest.get("description", "A Talon voice control package.")
-    shields = generate_shields(manifest)
     status = manifest.get("status", "").lower()
 
     lines = [
         f"# {title}",
         "",
-        *shields,
-        "",
-        description,
     ]
+
+    # Add shields if enabled
+    should_generate, _ = should_generate_shields(manifest)
+    if should_generate:
+        shields = generate_shields(manifest)
+        lines.extend(shields)
+        lines.append("")
+
+    lines.append(description)
 
     # Add preview image if it exists
     if (package_dir / "preview.png").exists():
@@ -51,13 +56,15 @@ def create_new_readme(manifest: dict, package_dir: Path) -> str:
 
 def update_existing_readme(content: str, manifest: dict, package_dir: Path) -> tuple[str, list[str]]:
     """Update shields in existing README, preserving all other content. Returns (content, actions_taken)."""
-    from generate_shields import generate_shields
+    from generate_shields import generate_shields, should_generate_shields
     from generate_install_block import generate_installation_markdown
 
-    shields = generate_shields(manifest)
     installation = generate_installation_markdown(manifest)
     status = manifest.get("status", "").lower()
     actions = []
+
+    # Check if we should generate shields
+    should_generate, _ = should_generate_shields(manifest)
 
     # Shield pattern to find existing shields
     shield_pattern = r"!\[(Version|Status|Platform|License|Talon Beta)\]\([^\)]+\)"
@@ -65,7 +72,10 @@ def update_existing_readme(content: str, manifest: dict, package_dir: Path) -> t
     # Check if shields already exist anywhere in the content
     existing_shields = re.findall(shield_pattern, content)
 
-    if existing_shields:
+    if should_generate:
+        shields = generate_shields(manifest)
+
+    if existing_shields and should_generate:
         # Shields exist - update them in place
         # Replace each old shield with corresponding new shield
         shield_lines = "\n".join(shields)
@@ -73,7 +83,7 @@ def update_existing_readme(content: str, manifest: dict, package_dir: Path) -> t
         shield_block_pattern = r"(?:" + shield_pattern + r"\s*)+"
         content = re.sub(shield_block_pattern, shield_lines + "\n\n", content, count=1)
         actions.append("updated shields")
-    else:
+    elif not existing_shields and should_generate:
         # No shields exist - add them
         # Try to add after title
         title_match = re.search(r"^#\s+.+$", content, re.MULTILINE)
@@ -87,6 +97,8 @@ def update_existing_readme(content: str, manifest: dict, package_dir: Path) -> t
             shields_text = "\n\n" + "\n".join(shields) + "\n"
             content = content.rstrip() + shields_text
             actions.append("added shields at end")
+    elif not should_generate:
+        actions.append("skipped shields (disabled)")
 
     # Check if Installation/Install/Setup section exists
     install_section_pattern = r"^#{1,6}\s+.*\b(Installation|Install|Setup)\b"

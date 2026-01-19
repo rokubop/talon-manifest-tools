@@ -43,6 +43,7 @@ Manifest fields:
 - _generatorVersion: Version of the generator tool (auto-added)
 - _generatorRequiresVersionAction: Whether generator should require version action (auto-added)
 - _generatorStrictNamespace: Whether generator should validate namespace consistency (default: true, auto-added)
+- _generatorShields: Whether to generate/update shield badges in README.md (default: true, optional)
 """
 
 def get_generator_version() -> str:

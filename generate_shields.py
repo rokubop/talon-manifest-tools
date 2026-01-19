@@ -29,6 +29,14 @@ STATUS_COLORS = {
     "archived": "lightgrey"
 }
 
+def should_generate_shields(manifest: dict) -> tuple[bool, str]:
+    """Check if shields should be generated. Returns (should_generate, reason)."""
+    if manifest.get('_generatorShields') == False:
+        return False, "_generatorShields is set to false"
+
+    return True, ""
+
+
 def generate_shields(manifest: dict) -> list[str]:
     """Generate shield badge markdown lines from manifest data."""
     shields = []
@@ -184,11 +192,17 @@ def process_directory(package_dir: str):
         with open(manifest_path, "r", encoding="utf-8") as f:
             manifest = json.load(f)
 
-        # Generate shields
-        shields = generate_shields(manifest)
-
         # Check if README exists
         readme_path = package_dir / "README.md"
+
+        # Check if we should generate shields
+        should_generate, reason = should_generate_shields(manifest)
+        if not should_generate:
+            print(f"Skipping shields generation: {reason}")
+            return True
+
+        # Generate shields
+        shields = generate_shields(manifest)
 
         if readme_path.exists():
             updated = update_readme(readme_path, manifest)
