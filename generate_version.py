@@ -194,7 +194,7 @@ def validate_dependencies():
         for dep, info in deps.items():
             version_action = f"{{info.get('namespace')}}_version"
             github_url = info.get('github', '')
-            version_str = info.get('min_version') or info.get('version')
+            version_str = info.get('min_version')
             try:
                 action_ref = actions
                 for part in version_action.split('.'):

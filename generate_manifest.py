@@ -1069,20 +1069,22 @@ def create_or_update_manifest(skip_version_errors: bool = False) -> None:
                 # Capture scanned versions before overriding with user's specified versions
                 scanned_versions = {pkg_name: pkg_info['min_version'] for pkg_name, pkg_info in package_dependencies.items()}
 
-                # Preserve manually specified min_versions and github URLs from existing manifest
+                # Preserve manually specified values from existing manifest
+                # Note: We only generate min_version, namespace, and github, but preserve
+                # any other fields (e.g., future version/max_version) that users added manually
                 existing_deps = existing_manifest_data.get("dependencies", {})
                 for pkg_name in existing_deps:
                     if pkg_name in package_dependencies:
                         if isinstance(existing_deps[pkg_name], str):
+                            # Simple string format: "1.2.3" -> convert to dict with min_version
                             package_dependencies[pkg_name]['min_version'] = existing_deps[pkg_name]
                         else:
+                            # Dict format: preserve all fields, but override min_version if present
+                            # This preserves future fields like 'version', 'max_version', etc.
+                            package_dependencies[pkg_name].update(existing_deps[pkg_name])
+                            # Ensure we use the user's min_version if they specified it
                             if 'min_version' in existing_deps[pkg_name]:
                                 package_dependencies[pkg_name]['min_version'] = existing_deps[pkg_name]['min_version']
-                            elif 'version' in existing_deps[pkg_name]:
-                                package_dependencies[pkg_name]['min_version'] = existing_deps[pkg_name]['version']
-                            # Preserve github URL if it exists in the existing manifest
-                            if 'github' in existing_deps[pkg_name]:
-                                package_dependencies[pkg_name]['github'] = existing_deps[pkg_name]['github']
 
             # Track dependencies before filtering
             all_resolved_deps = dict(package_dependencies)
@@ -1103,9 +1105,9 @@ def create_or_update_manifest(skip_version_errors: bool = False) -> None:
             if package_dependencies:
                 print(f"Package dependencies:")
                 for pkg_name, pkg_info in package_dependencies.items():
-                    base_info = f"  - {pkg_name} ({pkg_info['min_version']})"
+                    base_info = f"  - {pkg_name} ({pkg_info['min_version']}+)"
 
-                    # Check if newer version exists in workspace
+                    # Check if workspace version differs from min_version requirement
                     if pkg_name in scanned_versions and scanned_versions[pkg_name] != pkg_info['min_version']:
                         try:
                             # Compare versions (works for semver x.y.z format)
@@ -1113,6 +1115,8 @@ def create_or_update_manifest(skip_version_errors: bool = False) -> None:
                             current_parts = [int(x) for x in pkg_info['min_version'].split('.')]
                             if scanned_parts > current_parts:
                                 base_info += f" (workspace has {scanned_versions[pkg_name]})"
+                            elif scanned_parts < current_parts:
+                                base_info += f" WARNING: workspace has older version {scanned_versions[pkg_name]}"
                         except (ValueError, AttributeError):
                             # If version parsing fails, just show current version
                             pass
@@ -1123,7 +1127,7 @@ def create_or_update_manifest(skip_version_errors: bool = False) -> None:
                 print(f"Package dependencies (covered by devDependencies):")
                 for pkg_name in dev_deps_found:
                     dev_dep_info = existing_dev_deps[pkg_name]
-                    version = dev_dep_info.get('min_version') or dev_dep_info.get('version', 'unknown') if isinstance(dev_dep_info, dict) else dev_dep_info
+                    version = dev_dep_info.get('min_version', 'unknown') if isinstance(dev_dep_info, dict) else dev_dep_info
                     print(f"  - {pkg_name} ({version}) [devDependency]")
                 print()
             else:
