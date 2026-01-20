@@ -91,7 +91,7 @@ python generate_all.py ../talon-repo-1 ../talon-repo-2
   "license": "MIT",
   "dependencies": {
     "talon-ui-elements": {
-      "version": "0.13.0",
+      "min_version": "0.13.0",
       "namespace": "user.ui_elements",
       "github": "https://github.com/user/talon-ui-elements"
     }
@@ -204,15 +204,16 @@ def validate_dependencies():
                 for part in version_action.split('.'):
                     action_ref = getattr(action_ref, part)
                 installed = action_ref()
-                required = tuple(int(x) for x in info['version'].split('.'))
+                version_str = info.get('min_version') or info['version']
+                required = tuple(int(x) for x in version_str.split('.'))
                 if installed < required:
                     installed_str = '.'.join(map(str, installed))
-                    errors.append(f"  Update {dep} to {info['version']}+ (currently {installed_str})")
+                    errors.append(f"  Update {dep} to {version_str}+ (currently {installed_str})")
                     if github_url:
                         errors.append(f"    Navigate to the {dep} directory and run: git pull")
                         errors.append(f"    {github_url}")
             except AttributeError:
-                errors.append(f"  Cannot verify {dep} {info['version']}+ (missing or invalid {version_action} action)")
+                errors.append(f"  Cannot verify {dep} {version_str}+ (missing or invalid {version_action} action)")
                 if github_url:
                     errors.append(f"    Install/update from: {github_url}")
             except Exception as e:

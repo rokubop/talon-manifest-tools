@@ -46,7 +46,7 @@ def generate_installation_markdown(manifest: dict) -> str:
         # Add dependencies
         if has_dependencies:
             for dep_name, dep_info in dependencies.items():
-                version = dep_info.get('version', 'unknown')
+                version = dep_info.get('min_version') or dep_info.get('version', 'unknown')
                 github = dep_info.get('github', '')
                 if github:
                     lines.append(f"- [**{dep_name}**]({github}) (v{version}+)")
@@ -59,7 +59,7 @@ def generate_installation_markdown(manifest: dict) -> str:
         lines.append("\nOptional dependencies for development and testing:")
 
         for dep_name, dep_info in dev_dependencies.items():
-            version = dep_info.get('version', 'unknown')
+            version = dep_info.get('min_version') or dep_info.get('version', 'unknown')
             github = dep_info.get('github', '')
             if github:
                 lines.append(f"- [**{dep_name}**]({github}) (v{version}+)")
