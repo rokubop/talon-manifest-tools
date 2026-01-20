@@ -1054,6 +1054,7 @@ def create_or_update_manifest(skip_version_errors: bool = False) -> None:
             ])
 
             package_dependencies = {}
+            scanned_versions = {}  # Track scanned versions to compare with user's specified versions
             if has_dependencies:
                 # Lazy load: only scan manifests if we have dependencies to resolve
                 if entity_to_package is None:
@@ -1064,6 +1065,9 @@ def create_or_update_manifest(skip_version_errors: bool = False) -> None:
                 # Resolve package dependencies (exclude current package to prevent self-dependency)
                 current_pkg_name = existing_manifest_data.get('name', package_name)
                 package_dependencies = resolve_package_dependencies(new_entity_data.depends, entity_to_package, current_pkg_name)
+
+                # Capture scanned versions before overriding with user's specified versions
+                scanned_versions = {pkg_name: pkg_info['min_version'] for pkg_name, pkg_info in package_dependencies.items()}
 
                 # Preserve manually specified min_versions and github URLs from existing manifest
                 existing_deps = existing_manifest_data.get("dependencies", {})
@@ -1099,7 +1103,21 @@ def create_or_update_manifest(skip_version_errors: bool = False) -> None:
             if package_dependencies:
                 print(f"Package dependencies:")
                 for pkg_name, pkg_info in package_dependencies.items():
-                    print(f"  - {pkg_name} ({pkg_info['min_version']})")
+                    base_info = f"  - {pkg_name} ({pkg_info['min_version']})"
+
+                    # Check if newer version exists in workspace
+                    if pkg_name in scanned_versions and scanned_versions[pkg_name] != pkg_info['min_version']:
+                        try:
+                            # Compare versions (works for semver x.y.z format)
+                            scanned_parts = [int(x) for x in scanned_versions[pkg_name].split('.')]
+                            current_parts = [int(x) for x in pkg_info['min_version'].split('.')]
+                            if scanned_parts > current_parts:
+                                base_info += f" (workspace has {scanned_versions[pkg_name]})"
+                        except (ValueError, AttributeError):
+                            # If version parsing fails, just show current version
+                            pass
+
+                    print(base_info)
                 print()
             elif dev_deps_found:
                 print(f"Package dependencies (covered by devDependencies):")
