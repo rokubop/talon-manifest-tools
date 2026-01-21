@@ -199,12 +199,16 @@ def validate_dependencies():
         for dep, info in deps.items():
             version_action = f"{{info.get('namespace')}}_version"
             github_url = info.get('github', '')
-            version_str = info.get('min_version')
+            version_str = info.get('min_version') or info.get('version')
             try:
                 action_ref = actions
                 for part in version_action.split('.'):
                     action_ref = getattr(action_ref, part)
                 installed = action_ref()
+
+                if isinstance(installed, str):
+                    installed = tuple(int(x) for x in installed.split('.'))
+
                 required = tuple(int(x) for x in version_str.split('.'))
                 if installed < required:
                     installed_str = '.'.join(map(str, installed))
