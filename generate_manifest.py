@@ -926,16 +926,20 @@ def load_existing_manifest(package_dir: str) -> dict:
             return json.load(f)
     return {}
 
-def create_or_update_manifest(skip_version_errors: bool = False) -> None:
+def create_or_update_manifest(skip_version_errors: bool = False, dry_run: bool = False) -> None:
     if len(sys.argv) < 2:
         print("Usage: python manifest_builder.py <directory> [<directory2> ...]")
         print("Example: python manifest_builder.py ../my-package")
         print("Example: python manifest_builder.py ../package1 ../package2")
+        print("Options: --dry-run (output to console instead of writing files)")
         sys.exit(1)
 
     root_path = os.getcwd()
 
     CREATE_MANIFEST_DIRS = [arg for arg in sys.argv[1:] if not arg.startswith('--')]
+
+    if dry_run:
+        print(f"DRY RUN MODE - No files will be modified\n")
 
     print(f"Processing {len(CREATE_MANIFEST_DIRS)} package(s)...\n")
 
@@ -1274,9 +1278,17 @@ def create_or_update_manifest(skip_version_errors: bool = False) -> None:
                 apply_frozen_fields(new_manifest_data, existing_manifest_data, frozen_fields)
 
             new_manifest_data = prune_manifest_data(new_manifest_data)
-            update_manifest(full_package_dir, new_manifest_data)
-            manifest_path = os.path.join(relative_dir, 'manifest.json').replace('\\', '/')
-            print(f"Manifest updated: {manifest_path}")
+
+            if dry_run:
+                # Output JSON to console instead of writing file
+                print(f"\n{'='*60}")
+                print(f"Generated manifest (not saved):")
+                print(f"{'='*60}\n")
+                print(json.dumps(new_manifest_data, indent=2, ensure_ascii=False))
+            else:
+                update_manifest(full_package_dir, new_manifest_data)
+                manifest_path = os.path.join(relative_dir, 'manifest.json').replace('\\', '/')
+                print(f"Manifest updated: {manifest_path}")
 
             # Add separator if there are more packages to process
             if idx < len(CREATE_MANIFEST_DIRS) - 1:
@@ -1324,4 +1336,5 @@ def create_or_update_manifest(skip_version_errors: bool = False) -> None:
 
 if __name__ == "__main__":
     skip_version_errors = "--skip-version-check" in sys.argv
-    create_or_update_manifest(skip_version_errors)
+    dry_run = "--dry-run" in sys.argv
+    create_or_update_manifest(skip_version_errors, dry_run)

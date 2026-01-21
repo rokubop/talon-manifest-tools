@@ -121,7 +121,7 @@ def update_existing_readme(content: str, manifest: dict, package_dir: Path) -> t
     return content, actions
 
 
-def process_directory(package_dir: str):
+def process_directory(package_dir: str, dry_run: bool = False):
     """Process a single directory."""
     package_dir = Path(package_dir).resolve()
 
@@ -146,19 +146,32 @@ def process_directory(package_dir: str):
 
             updated_content, actions = update_existing_readme(content, manifest, package_dir)
 
-            with open(readme_path, "w", encoding="utf-8") as f:
-                f.write(updated_content)
+            if dry_run:
+                actions_str = " and ".join(actions)
+                print(f"\nWould update README: {actions_str}\n")
+                print("="*60)
+                print(updated_content)
+                print("="*60)
+            else:
+                with open(readme_path, "w", encoding="utf-8") as f:
+                    f.write(updated_content)
 
-            actions_str = " and ".join(actions)
-            print(f"Updated README: {actions_str}")
+                actions_str = " and ".join(actions)
+                print(f"Updated README: {actions_str}")
         else:
             # Create new README
             new_content = create_new_readme(manifest, package_dir)
 
-            with open(readme_path, "w", encoding="utf-8") as f:
-                f.write(new_content)
+            if dry_run:
+                print(f"\nWould create new README.md\n")
+                print("="*60)
+                print(new_content)
+                print("="*60)
+            else:
+                with open(readme_path, "w", encoding="utf-8") as f:
+                    f.write(new_content)
 
-            print(f"Created new {readme_path}")
+                print(f"Created new {readme_path}")
         return True
     except Exception as e:
         print(f"Error processing {package_dir}: {e}")
@@ -166,17 +179,22 @@ def process_directory(package_dir: str):
 
 
 def main():
+    # Parse flags
+    dry_run = "--dry-run" in sys.argv
+
     # Get directories from arguments or use current directory
-    if len(sys.argv) > 1:
-        package_dirs = sys.argv[1:]
-    else:
+    package_dirs = [arg for arg in sys.argv[1:] if not arg.startswith('--')]
+    if not package_dirs:
         package_dirs = ["."]
+
+    if dry_run:
+        print("DRY RUN MODE - No files will be modified\n")
 
     success_count = 0
     total_count = len(package_dirs)
 
     for package_dir in package_dirs:
-        if process_directory(package_dir):
+        if process_directory(package_dir, dry_run):
             success_count += 1
 
     if total_count > 1:

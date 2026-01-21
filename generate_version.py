@@ -61,7 +61,7 @@ def add_version_action_to_manifest(manifest_path: str, action_name: str) -> None
         with open(manifest_path, 'w', encoding='utf-8') as f:
             json.dump(manifest, f, indent=2)
 
-def generate_version_action(package_dir: str, force: bool = False) -> None:
+def generate_version_action(package_dir: str, force: bool = False, dry_run: bool = False) -> None:
     """Generate version action file for a package"""
     full_package_dir = os.path.abspath(package_dir)
 
@@ -160,7 +160,7 @@ try:
     # Version is cached at import. Restart or save this file to pick up changes.
     with open(Path(__file__).parent / 'manifest.json', 'r', encoding='utf-8') as f:
         _VERSION = tuple(map(int, json.load(f)['version'].split('.')))
-except (FileNotFoundError, KeyError, ValueError) as e:
+except Exception as e:
     print(f"ERROR: {package_name} failed to load version from manifest.json: {{e}}")
     _VERSION = (0, 0, 0)
 
@@ -241,28 +241,43 @@ def validate_dependencies():
 app.register("ready", validate_dependencies)
 '''
 
-    # Write the version file
-    with open(version_file_path, 'w', encoding='utf-8') as f:
-        f.write(version_file_content)
+    if dry_run:
+        # Output to console instead of writing file
+        display_path = version_file_path.replace('\\', '/')
+        print(f"\nWould generate: {display_path}")
+        if action_name:
+            print(f"  Action: actions.user.{action_name}_version()")
+        print(f"  Generator: v{generator_version}\n")
+        print("="*60)
+        print(version_file_content)
+        print("="*60)
+    else:
+        # Write the version file
+        with open(version_file_path, 'w', encoding='utf-8') as f:
+            f.write(version_file_content)
 
-    if not version_file_exists and action_name:
-        add_version_action_to_manifest(manifest_path, action_name)
+        if not version_file_exists and action_name:
+            add_version_action_to_manifest(manifest_path, action_name)
 
-    display_path = version_file_path.replace('\\', '/')
-    print(f"\nGenerated: {display_path}")
-    if action_name:
-        print(f"  Action: actions.user.{action_name}_version()")
-    print(f"  Generator: v{generator_version}")
+        display_path = version_file_path.replace('\\', '/')
+        print(f"\nGenerated: {display_path}")
+        if action_name:
+            print(f"  Action: actions.user.{action_name}_version()")
+        print(f"  Generator: v{generator_version}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python generate_version.py <directory> [<directory2> ...] [--force]")
+        print("Usage: python generate_version.py <directory> [<directory2> ...] [--force] [--dry-run]")
         print("Example: python generate_version.py ../my-package")
         print("Example: python generate_version.py ../package1 ../package2")
         sys.exit(1)
 
     force = '--force' in sys.argv
-    package_dirs = [arg for arg in sys.argv[1:] if arg != '--force']
+    dry_run = '--dry-run' in sys.argv
+    package_dirs = [arg for arg in sys.argv[1:] if not arg.startswith('--')]
+
+    if dry_run:
+        print("DRY RUN MODE - No files will be modified\n")
 
     for package_dir in package_dirs:
-        generate_version_action(package_dir, force)
+        generate_version_action(package_dir, force, dry_run)

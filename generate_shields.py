@@ -64,7 +64,7 @@ def generate_shields(manifest: dict) -> list[str]:
     return shields
 
 
-def update_readme(readme_path: Path, manifest: dict) -> bool:
+def update_readme(readme_path: Path, manifest: dict, dry_run: bool = False) -> bool:
     """Update README.md shields. Returns True if updated."""
     if not readme_path.exists():
         return False
@@ -85,10 +85,16 @@ def update_readme(readme_path: Path, manifest: dict) -> bool:
 
     # Find all consecutive shields and replace as a block
     shield_block_pattern = r"(?:" + shield_pattern + r"\s*)+"
-    content = re.sub(shield_block_pattern, new_shields_block + "\n\n", content, count=1)
+    updated_content = re.sub(shield_block_pattern, new_shields_block + "\n\n", content, count=1)
 
-    with open(readme_path, "w", encoding="utf-8") as f:
-        f.write(content)
+    if dry_run:
+        print(f"\nWould update shields in {readme_path}\n")
+        print("="*60)
+        print(updated_content)
+        print("="*60)
+    else:
+        with open(readme_path, "w", encoding="utf-8") as f:
+            f.write(updated_content)
 
     return True
 
@@ -103,7 +109,7 @@ def print_display_block(shields: list[str]):
     print("=" * 60 + "\n")
 
 
-def process_directory(package_dir: str):
+def process_directory(package_dir: str, dry_run: bool = False):
     """Process a single directory."""
     package_dir = Path(package_dir).resolve()
 
@@ -131,10 +137,10 @@ def process_directory(package_dir: str):
         shields = generate_shields(manifest)
 
         if readme_path.exists():
-            updated = update_readme(readme_path, manifest)
-            if updated:
+            updated = update_readme(readme_path, manifest, dry_run)
+            if updated and not dry_run:
                 print(f"Updated shields in {readme_path}")
-            else:
+            elif not updated:
                 # README exists but no shields found - print display block
                 print(f"\nShields for {package_dir}:")
                 print_display_block(shields)
@@ -149,17 +155,22 @@ def process_directory(package_dir: str):
 
 
 def main():
+    # Parse flags
+    dry_run = "--dry-run" in sys.argv
+
     # Get directories from arguments or use current directory
-    if len(sys.argv) > 1:
-        package_dirs = sys.argv[1:]
-    else:
+    package_dirs = [arg for arg in sys.argv[1:] if not arg.startswith('--')]
+    if not package_dirs:
         package_dirs = ["."]
+
+    if dry_run:
+        print("DRY RUN MODE - No files will be modified\n")
 
     success_count = 0
     total_count = len(package_dirs)
 
     for package_dir in package_dirs:
-        if process_directory(package_dir):
+        if process_directory(package_dir, dry_run):
             success_count += 1
 
     if total_count > 1:

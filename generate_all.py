@@ -37,7 +37,7 @@ def run_generator(script_name: str, directory: str, extra_args: list = None) -> 
         return False
 
 
-def process_directory(package_dir: Path) -> bool:
+def process_directory(package_dir: Path, dry_run: bool = False) -> bool:
     """Process a single directory with all generators."""
     if not package_dir.exists():
         print(f"Error: Directory not found: {package_dir}")
@@ -47,10 +47,14 @@ def process_directory(package_dir: Path) -> bool:
     print("=" * 60)
 
     # Run generators in sequence
+    base_args = ["--skip-version-check"]
+    if dry_run:
+        base_args.append("--dry-run")
+
     generators = [
-        ("generate_manifest.py", ["--skip-version-check"]),
-        ("generate_version.py", None),
-        ("generate_readme.py", None)
+        ("generate_manifest.py", base_args),
+        ("generate_version.py", ["--dry-run"] if dry_run else None),
+        ("generate_readme.py", ["--dry-run"] if dry_run else None)
     ]
 
     for generator, extra_args in generators:
@@ -65,17 +69,22 @@ def process_directory(package_dir: Path) -> bool:
 
 
 def main():
+    # Parse flags
+    dry_run = "--dry-run" in sys.argv
+
     # Get directories from arguments or use current directory
-    if len(sys.argv) > 1:
-        package_dirs = [Path(d).resolve() for d in sys.argv[1:]]
-    else:
+    package_dirs = [Path(d).resolve() for d in sys.argv[1:] if not d.startswith('--')]
+    if not package_dirs:
         package_dirs = [Path(".").resolve()]
+
+    if dry_run:
+        print("DRY RUN MODE - No files will be modified\n")
 
     success_count = 0
     total_count = len(package_dirs)
 
     for package_dir in package_dirs:
-        if process_directory(package_dir):
+        if process_directory(package_dir, dry_run):
             success_count += 1
 
     print("\n" + "=" * 60)
