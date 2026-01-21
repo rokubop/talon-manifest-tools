@@ -197,18 +197,17 @@ def validate_dependencies():
         errors = []
 
         for dep, info in deps.items():
-            version_action = f"{{info.get('namespace')}}_version"
+            version_action_name = f"{{info.get('namespace')}}_version"
             github_url = info.get('github', '')
             version_str = info.get('min_version') or info.get('version')
             try:
-                action_ref = actions
-                for part in version_action.split('.'):
-                    action_ref = getattr(action_ref, part)
-                installed = action_ref()
+                version_action = actions
+                for part in version_action_name.split('.'):
+                    version_action = getattr(version_action, part)
+                installed = version_action()
 
-                # Handle both tuple and string versions
-                if isinstance(installed, str):
-                    installed = tuple(int(x) for x in installed.split('.'))
+                if not isinstance(installed, tuple):
+                    installed = tuple(int(x) for x in str(installed).split('.'))
 
                 required = tuple(int(x) for x in version_str.split('.'))
                 if installed < required:
@@ -219,7 +218,7 @@ def validate_dependencies():
                         errors.append(f"    {{github_url}}")
                     errors.append("")
             except Exception as e:
-                errors.append(f"  Cannot verify {{dep}} {{version_str}}+ (missing or invalid {{version_action}} action)")
+                errors.append(f"  Cannot verify {{dep}} {{version_str}}+ (missing or invalid {{version_action_name}} action)")
                 if github_url:
                     errors.append(f"    Install/update from: {{github_url}}")
                 errors.append(f"    {{e}}")
@@ -227,7 +226,7 @@ def validate_dependencies():
 
         if errors:
             print(f"{'='*60}")
-            print(f"{{data.get('name')}}: dependency requirements not met.\\n")
+            print(f"{{data.get('name')}}: dependency requirements not met\\n")
             for error in errors:
                 print(error)
             print("  WARNING: Review code from unfamiliar sources before installing")
