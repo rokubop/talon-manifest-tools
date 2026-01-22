@@ -251,17 +251,22 @@ class EntityVisitor(ParentNodeVisitor):
 
     def visit_Assign(self, node):
         try:
+            # Handle subscript assignments: ctx.lists["user.list_name"] = {...}
+            if isinstance(node.targets[0], ast.Subscript):
+                if isinstance(node.targets[0].value, ast.Attribute):
+                    if node.targets[0].value.attr == "lists":
+                        # Extract the list name from the subscript
+                        if isinstance(node.targets[0].slice, ast.Constant):
+                            list_name = node.targets[0].slice.value
+                            if list_name not in self.all_entities.depends.lists:
+                                self.all_entities.depends.lists.add(list_name)
+
             if isinstance(node.targets[0], ast.Attribute):
                 target = node.targets[0].attr
                 value = node.value
 
-                # Handle lists (e.g., ctx.lists["user.symbol_key"] = {...})
-                if isinstance(node.targets[0].value, ast.Attribute) and node.targets[0].value.attr == "lists":
-                    if isinstance(value, ast.Dict) and target not in self.all_entities.depends.lists:
-                        self.all_entities.depends.lists.add(target)
-
                 # Handle tags (e.g., ctx.tags = ["user.tabs"])
-                elif target == "tags":
+                if target == "tags":
                     if isinstance(value, ast.List):
                         for elt in value.elts:
                             if isinstance(elt, ast.Constant):
@@ -372,7 +377,11 @@ def parse_file(file_path: str, all_entities: AllEntities) -> None:
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             file_content = file.read()
-        tree = ast.parse(file_content)
+        # Suppress SyntaxWarning for invalid escape sequences (common in app.exe regex patterns)
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=SyntaxWarning)
+            tree = ast.parse(file_content)
         visitor = EntityVisitor(all_entities)
         visitor.visit(tree)
     except Exception as e:
@@ -551,6 +560,18 @@ def parse_talon_file(file_path: str, all_entities: AllEntities) -> None:
         # Matches: settings.get("user.my_setting") or settings.get('user.my_setting')
         settings_get_pattern = r'settings\.get\s*\(\s*["\']([^"\']+)["\']\s*\)'
         for match in re.finditer(settings_get_pattern, command_body):
+            all_entities.depends.settings.add(match.group(1))
+
+        # Extract tags from command body: tag(): user.tag_name
+        # Matches: tag(): user.my_tag
+        tag_call_pattern = r'^\s*tag\(\):\s+(user\.[a-z_][a-z0-9_]*)'
+        for match in re.finditer(tag_call_pattern, command_body, re.MULTILINE):
+            all_entities.depends.tags.add(match.group(1))
+
+        # Extract settings from settings() block in command body: user.setting_name = value
+        # Matches: settings():\n    user.my_setting = value
+        settings_block_pattern = r'^\s+(user\.[a-z_][a-z0-9_]*)\s*='
+        for match in re.finditer(settings_block_pattern, command_body, re.MULTILINE):
             all_entities.depends.settings.add(match.group(1))
 
         # ==============================================================================
