@@ -4,11 +4,11 @@
 ![Status](https://img.shields.io/badge/status-preview-orange)
 ![License](https://img.shields.io/badge/license-Unlicense-green)
 
-![Preview](preview-thing.svg)
+![Preview](preview.svg)
 
-Provides scripts for generating package-like files for your Talon repo: `manifest.json` with dependencies and contributions, `_version.py` with version actions and dependency validation, `README.md` with shield badges and installation instructions, and more.
+Catalogs your Talon repo's contributions and dependencies, generates version validation, and updates your README with badges.
 
-> **Note:** This is an unofficial community tool for generating metadata files, versioning conventions, and dependency checking for Talon repositories.
+> **Note:** Unofficial community tool.
 
 ## Installation
 
@@ -16,10 +16,10 @@ Clone this repo into your Talon directory (either the root or user subdirectory)
 
 ```sh
 # mac and linux
-cd ~/.talon  # or ~/.talon/user
+cd ~/.talon
 
 # windows
-cd ~/AppData/Roaming/talon  # or ~/AppData/Roaming/talon/user
+cd ~/AppData/Roaming/talon
 
 git clone https://github.com/rokubop/talon-pack
 ```
@@ -30,20 +30,30 @@ Set up an alias to run from any directory:
 
 ```bash
 # Bash/Zsh (Mac/Linux) - add to ~/.bashrc or ~/.zshrc
-alias tpack="python ~/.talon/user/talon-pack/generate_all.py"
+alias tpack="python ~/.talon/talon-pack/generate_all.py"
 
-# PowerShell (Windows) - add to $PROFILE
-function tpack { python "$env:APPDATA\talon\user\talon-pack\generate_all.py" @args }
+# Bash (Windows) - add to ~/.bashrc
+alias tpack="python ~/AppData/Roaming/talon/talon-pack/generate_all.py"
+
+# PowerShell (Windows) - run: notepad $PROFILE, then add:
+function tpack { python "$env:APPDATA\talon\talon-pack\generate_all.py" @args }
 ```
 
-Then from any Talon package folder:
+Then cd to your Talon package folder:
 ```bash
-tpack
+# mac, linux
+cd ~/.talon/user/my-talon-package
+
+# windows
+cd ~/AppData/Roaming/talon/user/my-talon-package
+tpack              # Generate/update manifest, version, and readme files
+tpack --dry-run    # Preview changes without writing files
+tpack --help       # Show all options
 ```
 
 ## Scripts
 
-Use `generate_all.py` (or the `tpack` alias) to run all generators at once, or run individual scripts for specific tasks.
+Individual scripts can be run directly for specific tasks:
 
 ### generate_manifest.py
 Parses Python and Talon files to detect Talon entities (actions, settings, tags, lists, modes, scopes, captures, and apps) you contribute or depend on. Scans user directory to find all other packages with manifests to build an index of available packages. Maps your imported entities to specific packages and their versions. Creates or updates `manifest.json` with all discovered information, preserving your manual edits to fields like name, description, etc.

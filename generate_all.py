@@ -3,7 +3,15 @@ Run all generators in sequence: manifest, version, and readme.
 Will update instead of overwriting existing code where relevant.
 
 Usage:
-  py generate_all.py [directory]    # Generate all files for directory (default: current)
+  tpack [directory]              Generate all files (default: current directory)
+  tpack --dry-run                Preview changes without writing files
+  tpack --manifest-only          Only run manifest generator
+  tpack --version-only           Only run version generator
+  tpack --readme-only            Only run readme generator
+  tpack --no-manifest            Skip manifest generator
+  tpack --no-version             Skip version generator
+  tpack --no-readme              Skip readme generator
+  tpack --help                   Show this help message
 """
 
 import sys
@@ -37,8 +45,10 @@ def run_generator(script_name: str, directory: str, extra_args: list = None) -> 
         return False
 
 
-def process_directory(package_dir: Path, dry_run: bool = False) -> bool:
-    """Process a single directory with all generators."""
+def process_directory(package_dir: Path, dry_run: bool = False,
+                      run_manifest: bool = True, run_version: bool = True,
+                      run_readme: bool = True) -> bool:
+    """Process a single directory with selected generators."""
     if not package_dir.exists():
         print(f"Error: Directory not found: {package_dir}")
         return False
@@ -51,11 +61,17 @@ def process_directory(package_dir: Path, dry_run: bool = False) -> bool:
     if dry_run:
         base_args.append("--dry-run")
 
-    generators = [
-        ("generate_manifest.py", base_args),
-        ("generate_version.py", ["--dry-run"] if dry_run else None),
-        ("generate_readme.py", ["--dry-run"] if dry_run else None)
-    ]
+    generators = []
+    if run_manifest:
+        generators.append(("generate_manifest.py", base_args))
+    if run_version:
+        generators.append(("generate_version.py", ["--dry-run"] if dry_run else None))
+    if run_readme:
+        generators.append(("generate_readme.py", ["--dry-run"] if dry_run else None))
+
+    if not generators:
+        print("No generators selected to run.")
+        return False
 
     for generator, extra_args in generators:
         print(f"\nRunning {generator}...")
@@ -69,8 +85,24 @@ def process_directory(package_dir: Path, dry_run: bool = False) -> bool:
 
 
 def main():
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print(__doc__)
+        sys.exit(0)
+
     # Parse flags
     dry_run = "--dry-run" in sys.argv
+    no_manifest = "--no-manifest" in sys.argv
+    no_version = "--no-version" in sys.argv
+    no_readme = "--no-readme" in sys.argv
+    manifest_only = "--manifest-only" in sys.argv
+    version_only = "--version-only" in sys.argv
+    readme_only = "--readme-only" in sys.argv
+
+    # Determine which generators to run
+    only_mode = manifest_only or version_only or readme_only
+    run_manifest = manifest_only if only_mode else not no_manifest
+    run_version = version_only if only_mode else not no_version
+    run_readme = readme_only if only_mode else not no_readme
 
     # Get directories from arguments or use current directory
     package_dirs = [Path(d).resolve() for d in sys.argv[1:] if not d.startswith('--')]
@@ -84,7 +116,7 @@ def main():
     total_count = len(package_dirs)
 
     for package_dir in package_dirs:
-        if process_directory(package_dir, dry_run):
+        if process_directory(package_dir, dry_run, run_manifest, run_version, run_readme):
             success_count += 1
 
     print("\n" + "=" * 60)
