@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80" width="200" height="80">
+  <!-- Center package/bundle -->
+  <rect x="25" y="25" width="30" height="30" rx="4" fill="#3b82f6" stroke="#1e3a8f" stroke-width="2" />
+  <path d="M40 25 L40 55 M25 40 L55 40" stroke="#1e3a8f" stroke-width="2" />
+
+  <!-- Converging arrows/items -->
+  <!-- Top left -->
+  <circle cx="12" cy="12" r="6" fill="#4b5563" stroke="#6b7280" stroke-width="1.5" />
+  <path d="M16 16 L24 24" stroke="#6b7280" stroke-width="2" stroke-linecap="round" />
+
+  <!-- Top right -->
+  <circle cx="68" cy="12" r="6" fill="#4b5563" stroke="#6b7280" stroke-width="1.5" />
+  <path d="M64 16 L56 24" stroke="#6b7280" stroke-width="2" stroke-linecap="round" />
+
+  <!-- Bottom left -->
+  <circle cx="12" cy="68" r="6" fill="#4b5563" stroke="#6b7280" stroke-width="1.5" />
+  <path d="M16 64 L24 56" stroke="#6b7280" stroke-width="2" stroke-linecap="round" />
+
+  <!-- Bottom right -->
+  <circle cx="68" cy="68" r="6" fill="#4b5563" stroke="#6b7280" stroke-width="1.5" />
+  <path d="M64 64 L56 56" stroke="#6b7280" stroke-width="2" stroke-linecap="round" />
+
+  <!-- Text -->
+  <text x="90" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600"
+    fill="#9ca3af">aggregate</text>
+  <text x="90" y="54" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600"
+    fill="#9ca3af">dependencies</text>
+</svg>
