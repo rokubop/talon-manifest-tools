@@ -8,7 +8,7 @@
   "github": "https://github.com/rokubop/talon-pack",
   "preview": "https://raw.githubusercontent.com/rokubop/talon-pack/main/preview.svg",
   "author": "Rokubop",
-  "tags": [],
+  "tags": ["package", "manifest", "version", "badges"],
   "license": "Unlicense",
   "dependencies": {},
   "devDependencies": {},
