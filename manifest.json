@@ -2,7 +2,7 @@
   "name": "talon-pack",
   "title": "Talon Pack",
   "description": "Catalogs your Talon repo's contributions and dependencies, generates version validation, and updates your README with badges.",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "status": "preview",
   "namespace": "",
   "github": "https://github.com/rokubop/talon-pack",
@@ -16,7 +16,7 @@
   "depends": {},
   "validateDependencies": false,
   "_generator": "talon-pack",
-  "_generatorVersion": "2.0.0",
+  "_generatorVersion": "3.0.0",
   "_generatorRequiresVersionAction": false,
   "_generatorStrictNamespace": true,
   "_generatorFrozenFields": []
