@@ -61,7 +61,7 @@ def add_version_action_to_manifest(manifest_path: str, action_name: str) -> None
         with open(manifest_path, 'w', encoding='utf-8') as f:
             json.dump(manifest, f, indent=2)
 
-def generate_version_action(package_dir: str, force: bool = False, dry_run: bool = False) -> None:
+def generate_version_action(package_dir: str, force: bool = False, dry_run: bool = False, verbose: bool = False, alt_manifest_path: str = None) -> None:
     """Generate version action file for a package"""
     full_package_dir = os.path.abspath(package_dir)
 
@@ -69,12 +69,19 @@ def generate_version_action(package_dir: str, force: bool = False, dry_run: bool
         print(f"Error: Directory not found: {full_package_dir}")
         sys.exit(1)
 
-    # Read manifest.json
-    manifest_path = os.path.join(full_package_dir, 'manifest.json')
+    # Read manifest.json (or from alternate path if provided)
+    manifest_path = alt_manifest_path or os.path.join(full_package_dir, 'manifest.json')
     if not os.path.exists(manifest_path):
-        print(f"Error: manifest.json not found in {full_package_dir}")
-        print("Run generate_manifest.py first to generate a manifest.")
-        sys.exit(1)
+        if dry_run:
+            # In dry-run mode, manifest might not exist yet (would be created by generate_manifest)
+            from diff_utils import DIM, RESET
+            print(f"_version.py: {DIM}(skipped - manifest.json doesn't exist yet){RESET}")
+            return
+        else:
+            from diff_utils import RED, RESET
+            print(f"{RED}Error: manifest.json not found in {full_package_dir}{RESET}")
+            print("Run generate_manifest.py first to generate a manifest.")
+            sys.exit(1)
 
     with open(manifest_path, 'r', encoding='utf-8') as f:
         manifest = json.load(f)
@@ -91,7 +98,8 @@ def generate_version_action(package_dir: str, force: bool = False, dry_run: bool
 
     # Only require namespace if version action is required
     if requires_version_action and not namespace:
-        print(f"Error: No namespace found in manifest.json")
+        from diff_utils import RED, RESET
+        print(f"{RED}Error: No namespace found in manifest.json{RESET}")
         print(f"Either add a namespace or set _generatorRequiresVersionAction to false")
         sys.exit(1)
 
@@ -122,12 +130,17 @@ def generate_version_action(package_dir: str, force: bool = False, dry_run: bool
                 print(f"Regenerating _version.py (dependency state changed)")
 
     if not force and not needs_regen and existing_version and existing_version == generator_version:
-        print(f"\n_version.py is already up to date (v{generator_version})")
-        print(f"Use --force to regenerate anyway")
+        from diff_utils import status_no_change
+        if verbose:
+            print(f"\n_version.py is already up to date (v{generator_version})")
+            print(f"Use --force to regenerate anyway")
+        else:
+            print(status_no_change("_version.py"))
         sys.exit(0)
     elif force and existing_version == generator_version:
-        print(f"Force regenerating _version.py (v{generator_version})")
-    elif existing_version:
+        if verbose:
+            print(f"Force regenerating _version.py (v{generator_version})")
+    elif existing_version and verbose:
         print(f"Updating _version.py from v{existing_version} to v{generator_version}")
 
     # Generate the version action file
@@ -254,42 +267,85 @@ app.register("ready", validate_dependencies)
 '''
 
     if dry_run:
-        # Output to console instead of writing file
-        display_path = version_file_path.replace('\\', '/')
-        print(f"\nWould generate: {display_path}")
-        if action_name:
-            print(f"  Action: actions.user.{action_name}_version()")
-        print(f"  Generator: v{generator_version}\n")
-        print("="*60)
-        print(version_file_content)
-        print("="*60)
+        # Show diff without writing
+        from diff_utils import diff_text, format_diff_output, status_no_change, status_created, DIM, RESET
+
+        existing_content = ""
+        if version_file_exists:
+            with open(version_file_path, 'r', encoding='utf-8') as f:
+                existing_content = f.read()
+
+        has_changes, diff_output = diff_text(existing_content, version_file_content, "_version.py")
+
+        if not version_file_exists:
+            print(status_created("_version.py") + f" {DIM}(dry run){RESET}")
+            # Show full content as diff (all + lines)
+            _, new_diff = diff_text("", version_file_content, "_version.py")
+            print(format_diff_output(new_diff))
+        elif has_changes:
+            print(f"_version.py: {DIM}(dry run){RESET}")
+            print(format_diff_output(diff_output))
+        else:
+            print(status_no_change("_version.py"))
     else:
-        # Write the version file
-        with open(version_file_path, 'w', encoding='utf-8') as f:
-            f.write(version_file_content)
+        # Read existing content for diff comparison
+        existing_content = ""
+        if version_file_exists:
+            with open(version_file_path, 'r', encoding='utf-8') as f:
+                existing_content = f.read()
 
-        if not version_file_exists and action_name:
-            add_version_action_to_manifest(manifest_path, action_name)
+        # Compare and show diff or "no changes"
+        from diff_utils import diff_text, format_diff_output, status_no_change, status_created
 
-        display_path = version_file_path.replace('\\', '/')
-        print(f"\nGenerated: {display_path}")
-        if action_name:
-            print(f"  Action: actions.user.{action_name}_version()")
-        print(f"  Generator: v{generator_version}")
+        has_changes, diff_output = diff_text(existing_content, version_file_content, "_version.py")
+
+        if not version_file_exists:
+            # New file - always write
+            with open(version_file_path, 'w', encoding='utf-8') as f:
+                f.write(version_file_content)
+            if action_name:
+                add_version_action_to_manifest(manifest_path, action_name)
+            print(status_created("_version.py"))
+            # Show full content as diff (all + lines)
+            _, new_diff = diff_text("", version_file_content, "_version.py")
+            print(format_diff_output(new_diff))
+        elif has_changes:
+            # Existing file with changes - show diff and write
+            with open(version_file_path, 'w', encoding='utf-8') as f:
+                f.write(version_file_content)
+            print(f"_version.py:")
+            print(format_diff_output(diff_output))
+        else:
+            # No changes (shouldn't normally reach here due to early exit above)
+            print(status_no_change("_version.py"))
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python generate_version.py <directory> [<directory2> ...] [--force] [--dry-run]")
+        print("Usage: python generate_version.py <directory> [<directory2> ...] [--force] [--dry-run] [--verbose]")
         print("Example: python generate_version.py ../my-package")
         print("Example: python generate_version.py ../package1 ../package2")
         sys.exit(1)
 
     force = '--force' in sys.argv
     dry_run = '--dry-run' in sys.argv
-    package_dirs = [arg for arg in sys.argv[1:] if not arg.startswith('--')]
+    verbose = '--verbose' in sys.argv or '-v' in sys.argv
 
-    if dry_run:
+    # Get alternate manifest path (for dry-run mode with mock manifest)
+    alt_manifest_path = None
+    skip_next = False
+    package_dirs = []
+    for i, arg in enumerate(sys.argv[1:], 1):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg == "--manifest-path" and i + 1 < len(sys.argv):
+            alt_manifest_path = sys.argv[i + 1]
+            skip_next = True
+        elif not arg.startswith('--'):
+            package_dirs.append(arg)
+
+    if dry_run and verbose:
         print("DRY RUN MODE - No files will be modified\n")
 
     for package_dir in package_dirs:
-        generate_version_action(package_dir, force, dry_run)
+        generate_version_action(package_dir, force, dry_run, verbose, alt_manifest_path)

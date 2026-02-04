@@ -121,15 +121,21 @@ def update_existing_readme(content: str, manifest: dict, package_dir: Path) -> t
     return content, actions
 
 
-def process_directory(package_dir: str, dry_run: bool = False):
+def process_directory(package_dir: str, dry_run: bool = False, verbose: bool = False, alt_manifest_path: str = None):
     """Process a single directory."""
     package_dir = Path(package_dir).resolve()
 
-    # Find manifest.json
-    manifest_path = package_dir / "manifest.json"
+    # Find manifest.json (or use alternate path if provided)
+    manifest_path = Path(alt_manifest_path) if alt_manifest_path else package_dir / "manifest.json"
     if not manifest_path.exists():
-        print(f"Error: manifest.json not found in {package_dir}")
-        return False
+        if dry_run:
+            from diff_utils import DIM, RESET
+            print(f"README.md: {DIM}(skipped - manifest.json doesn't exist yet){RESET}")
+            return True
+        else:
+            from diff_utils import RED, RESET
+            print(f"{RED}Error: manifest.json not found in {package_dir}{RESET}")
+            return False
 
     # Load manifest
     with open(manifest_path, "r", encoding="utf-8") as f:
@@ -147,65 +153,88 @@ def process_directory(package_dir: str, dry_run: bool = False):
             updated_content, actions = update_existing_readme(content, manifest, package_dir)
 
             if dry_run:
-                actions_str = " and ".join(actions)
-                print(f"\nWould update README: {actions_str}\n")
-                print("="*60)
-                lines = updated_content.splitlines()
-                preview_lines = 20
-                print("\n".join(lines[:preview_lines]))
-                if len(lines) > preview_lines:
-                    print(f"\n... ({len(lines) - preview_lines} more lines)")
-                print("="*60)
-            else:
-                with open(readme_path, "w", encoding="utf-8") as f:
-                    f.write(updated_content)
+                # Show diff without writing
+                from diff_utils import diff_text, format_diff_output, status_no_change, DIM, RESET
 
-                actions_str = " and ".join(actions)
-                print(f"Updated README: {actions_str}")
+                has_changes, diff_output = diff_text(content, updated_content, "README.md")
+
+                if has_changes:
+                    print(f"README.md: {DIM}(dry run){RESET}")
+                    print(format_diff_output(diff_output))
+                else:
+                    print(status_no_change("README.md"))
+            else:
+                # Compare and show diff or "no changes"
+                from diff_utils import diff_text, format_diff_output, status_no_change, status_created
+
+                has_changes, diff_output = diff_text(content, updated_content, "README.md")
+
+                if has_changes:
+                    with open(readme_path, "w", encoding="utf-8") as f:
+                        f.write(updated_content)
+                    print(f"README.md:")
+                    print(format_diff_output(diff_output))
+                else:
+                    print(status_no_change("README.md"))
         else:
             # Create new README
             new_content = create_new_readme(manifest, package_dir)
 
             if dry_run:
-                print(f"\nWould create new README.md\n")
-                print("="*60)
-                lines = new_content.splitlines()
-                preview_lines = 20
-                print("\n".join(lines[:preview_lines]))
-                if len(lines) > preview_lines:
-                    print(f"\n... ({len(lines) - preview_lines} more lines)")
-                print("="*60)
+                from diff_utils import diff_text, format_diff_output, status_created, DIM, RESET
+                print(status_created("README.md") + f" {DIM}(dry run){RESET}")
+                # Show full content as diff (all + lines)
+                _, new_diff = diff_text("", new_content, "README.md")
+                print(format_diff_output(new_diff))
             else:
+                from diff_utils import diff_text, format_diff_output, status_created
                 with open(readme_path, "w", encoding="utf-8") as f:
                     f.write(new_content)
 
-                print(f"Created new {readme_path}")
+                print(status_created("README.md"))
+                # Show full content as diff (all + lines)
+                _, new_diff = diff_text("", new_content, "README.md")
+                print(format_diff_output(new_diff))
         return True
     except Exception as e:
-        print(f"Error processing {package_dir}: {e}")
+        from diff_utils import RED, RESET
+        print(f"{RED}Error processing {package_dir}: {e}{RESET}")
         return False
 
 
 def main():
     # Parse flags
     dry_run = "--dry-run" in sys.argv
+    verbose = "--verbose" in sys.argv or "-v" in sys.argv
 
-    # Get directories from arguments or use current directory
-    package_dirs = [arg for arg in sys.argv[1:] if not arg.startswith('--')]
+    # Get alternate manifest path (for dry-run mode with mock manifest)
+    alt_manifest_path = None
+    skip_next = False
+    package_dirs = []
+    for i, arg in enumerate(sys.argv[1:], 1):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg == "--manifest-path" and i + 1 < len(sys.argv):
+            alt_manifest_path = sys.argv[i + 1]
+            skip_next = True
+        elif not arg.startswith('--'):
+            package_dirs.append(arg)
+
     if not package_dirs:
         package_dirs = ["."]
 
-    if dry_run:
+    if dry_run and verbose:
         print("DRY RUN MODE - No files will be modified\n")
 
     success_count = 0
     total_count = len(package_dirs)
 
     for package_dir in package_dirs:
-        if process_directory(package_dir, dry_run):
+        if process_directory(package_dir, dry_run, verbose, alt_manifest_path):
             success_count += 1
 
-    if total_count > 1:
+    if total_count > 1 and verbose:
         print(f"\nProcessed {success_count}/{total_count} directories successfully")
 
 if __name__ == "__main__":

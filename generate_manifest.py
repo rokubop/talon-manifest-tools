@@ -854,10 +854,11 @@ def validate_namespace(namespace: str, contributes: Entities, strict: bool = Tru
                     warnings.append(f"  WARNING: {entity_type}: {entity} (expected '{namespace}' or '{namespace}_*')")
 
     if warnings:
-        print(f"\nNamespace warnings (expected namespace: {namespace}):")
+        from diff_utils import YELLOW, RESET
+        print(f"\n{YELLOW}Namespace warnings (expected namespace: {namespace}):{RESET}")
         for warning in warnings:
-            print(warning)
-        print(f"  To disable these warnings, set '_generatorStrictNamespace': false in manifest.json")
+            print(f"{YELLOW}{warning}{RESET}")
+        print(f"{YELLOW}  To disable these warnings, set '_generatorStrictNamespace': false in manifest.json{RESET}")
         print()
 
     return len(warnings)
@@ -887,11 +888,12 @@ def check_version_action(namespace: str, contributes: Entities, version_check: b
     has_version_action = expected_action in contributes.actions
 
     if not has_version_action:
+        from diff_utils import RED, YELLOW, RESET
         # Check if _version.py file exists
         version_file = os.path.join(package_dir, '_version.py')
         if not os.path.exists(version_file):
             if not skip_version_errors:
-                print(f"\nERROR: Missing required version action '{expected_action}'")
+                print(f"\n{RED}ERROR: Missing required version action '{expected_action}'{RESET}")
                 print(f"   Run: python generate_version.py {package_name}")
                 print(f"   Or set \"_generatorRequiresVersionAction\": false in manifest.json to skip this check")
                 print()
@@ -899,7 +901,7 @@ def check_version_action(namespace: str, contributes: Entities, version_check: b
             # When skipping errors (generate_all.py), don't count as error since it will be fixed next
             return 0
         else:
-            print(f"\nWARNING: _version.py exists but action '{expected_action}' not detected")
+            print(f"\n{YELLOW}WARNING: _version.py exists but action '{expected_action}' not detected{RESET}")
             print(f"   The file may need to be regenerated or Talon needs to be reloaded")
             print()
             return 0
@@ -974,7 +976,8 @@ def find_talon_user_dir() -> str:
         search_path = parent
 
     # Abort if we couldn't find the Talon user directory
-    print("ERROR: Could not find Talon directory")
+    from diff_utils import RED, RESET
+    print(f"{RED}ERROR: Could not find Talon directory{RESET}")
     print("  Searched up from script location but found no directory with:")
     print("    - Directory name 'talon' or '.talon'")
     print("    - user/ subdirectory")
@@ -982,12 +985,13 @@ def find_talon_user_dir() -> str:
     print(f"  Script location: {script_dir}")
     sys.exit(1)
 
-def create_or_update_manifest(skip_version_errors: bool = False, dry_run: bool = False) -> None:
+def create_or_update_manifest(skip_version_errors: bool = False, dry_run: bool = False, verbose: bool = False, output_manifest_path: str = None) -> None:
     if len(sys.argv) < 2:
         print("Usage: python manifest_builder.py <directory> [<directory2> ...]")
         print("Example: python manifest_builder.py ../my-package")
         print("Example: python manifest_builder.py ../package1 ../package2")
         print("Options: --dry-run (output to console instead of writing files)")
+        print("         --verbose, -v (show detailed output)")
         sys.exit(1)
 
     root_path = os.getcwd()
@@ -997,12 +1001,14 @@ def create_or_update_manifest(skip_version_errors: bool = False, dry_run: bool =
     if dry_run:
         print(f"DRY RUN MODE - No files will be modified\n")
 
-    print(f"Processing {len(CREATE_MANIFEST_DIRS)} package(s)...\n")
+    if verbose:
+        print(f"Processing {len(CREATE_MANIFEST_DIRS)} package(s)...\n")
 
     talon_user_dir = find_talon_user_dir()
 
     if not os.path.exists(root_path):
-        print(f"Error: Packages directory not found at {root_path}")
+        from diff_utils import RED, RESET
+        print(f"{RED}Error: Packages directory not found at {root_path}{RESET}")
         return
 
     # Defer manifest scanning until we know if any package has dependencies
@@ -1016,7 +1022,8 @@ def create_or_update_manifest(skip_version_errors: bool = False, dry_run: bool =
 
         if os.path.isdir(full_package_dir):
             package_name = os.path.basename(full_package_dir)
-            print(f"[{idx + 1}/{len(CREATE_MANIFEST_DIRS)}] Processing {package_name}")
+            if verbose:
+                print(f"[{idx + 1}/{len(CREATE_MANIFEST_DIRS)}] Processing {package_name}")
 
             existing_manifest_data = load_existing_manifest(full_package_dir)
             is_new_manifest = not existing_manifest_data
@@ -1071,11 +1078,12 @@ def create_or_update_manifest(skip_version_errors: bool = False, dry_run: bool =
                 if not namespace:
                     if has_contributions:
                         # No clear namespace pattern detected
-                        print(f"WARNING: Could not infer namespace - no prefix appears in >50% of contributions")
-                        print(f"  Contributions don't follow a consistent naming pattern")
-                        print(f"  Best practice: Use a common prefix for all contributions (e.g., 'user.my_pkg' or 'user.my_pkg_*')")
-                        print(f"  Or set 'namespace' manually in manifest.json")
-                        print(f"  Or set '_generatorStrictNamespace' to false to skip this check")
+                        from diff_utils import YELLOW, RESET
+                        print(f"{YELLOW}WARNING: Could not infer namespace - no prefix appears in >50% of contributions{RESET}")
+                        print(f"{YELLOW}  Contributions don't follow a consistent naming pattern{RESET}")
+                        print(f"{YELLOW}  Best practice: Use a common prefix for all contributions (e.g., 'user.my_pkg' or 'user.my_pkg_*'){RESET}")
+                        print(f"{YELLOW}  Or set 'namespace' manually in manifest.json{RESET}")
+                        print(f"{YELLOW}  Or set '_generatorStrictNamespace' to false to skip this check{RESET}")
                         print()
                         total_warnings += 1
                         namespace = ""
@@ -1112,9 +1120,11 @@ def create_or_update_manifest(skip_version_errors: bool = False, dry_run: bool =
             if has_dependencies:
                 # Lazy load: only scan manifests if we have dependencies to resolve
                 if entity_to_package is None:
-                    print("Scanning for package manifests (to resolve dependencies)...")
+                    if verbose:
+                        print("Scanning for package manifests (to resolve dependencies)...")
                     entity_to_package, manifest_count = scan_all_manifests(talon_user_dir)
-                    print(f"  Found {manifest_count} packages in workspace\n")
+                    if verbose:
+                        print(f"  Found {manifest_count} packages in workspace\n")
 
                 # Resolve package dependencies (exclude current package to prevent self-dependency)
                 current_pkg_name = existing_manifest_data.get('name', package_name)
@@ -1155,75 +1165,88 @@ def create_or_update_manifest(skip_version_errors: bool = False, dry_run: bool =
             contributes_count = sum(len(getattr(new_entity_data.contributes, key)) for key in ENTITIES)
             depends_count = sum(len(getattr(new_entity_data.depends, key)) for key in ENTITIES)
 
-            # Show dependency information
-            if package_dependencies:
-                print(f"Package dependencies:")
-                for pkg_name, pkg_info in package_dependencies.items():
-                    base_info = f"  - {pkg_name} ({pkg_info['min_version']}+)"
+            # Show dependency information (verbose mode only, but always show version warnings)
+            if verbose:
+                if package_dependencies:
+                    print(f"Package dependencies:")
+                    for pkg_name, pkg_info in package_dependencies.items():
+                        base_info = f"  - {pkg_name} ({pkg_info['min_version']}+)"
 
-                    # Check if workspace version differs from min_version requirement
+                        # Check if workspace version differs from min_version requirement
+                        if pkg_name in scanned_versions and scanned_versions[pkg_name] != pkg_info['min_version']:
+                            try:
+                                # Compare versions (works for semver x.y.z format)
+                                scanned_parts = [int(x) for x in scanned_versions[pkg_name].split('.')]
+                                current_parts = [int(x) for x in pkg_info['min_version'].split('.')]
+                                if scanned_parts > current_parts:
+                                    base_info += f" (workspace has {scanned_versions[pkg_name]})"
+                                elif scanned_parts < current_parts:
+                                    base_info += f" WARNING: workspace has older version {scanned_versions[pkg_name]}"
+                            except (ValueError, AttributeError):
+                                # If version parsing fails, just show current version
+                                pass
+
+                        print(base_info)
+                    print()
+                elif dev_deps_found:
+                    print(f"Package dependencies (covered by devDependencies):")
+                    for pkg_name in dev_deps_found:
+                        dev_dep_info = existing_dev_deps[pkg_name]
+                        version = dev_dep_info.get('min_version', 'unknown') if isinstance(dev_dep_info, dict) else dev_dep_info
+                        print(f"  - {pkg_name} ({version}) [devDependency]")
+                    print()
+                else:
+                    print(f"No package dependencies\n")
+
+                # Show contributes breakdown
+                if contributes_count > 0:
+                    breakdown = []
+                    for key in ENTITIES:
+                        count = len(getattr(new_entity_data.contributes, key))
+                        if count > 0:
+                            breakdown.append(f"{count} {key}")
+                    print(f"  Contributes: {contributes_count} items ({', '.join(breakdown)})")
+                else:
+                    print(f"  Contributes: 0 items")
+
+                # Show depends breakdown
+                if depends_count > 0:
+                    breakdown = []
+                    for key in ENTITIES:
+                        count = len(getattr(new_entity_data.depends, key))
+                        if count > 0:
+                            if key == "actions":
+                                # Split actions into package and built-in
+                                all_actions = getattr(new_entity_data.depends, key)
+                                builtin_count = sum(1 for action in all_actions if is_builtin_action(action))
+                                package_count = count - builtin_count
+                                if package_count > 0 and builtin_count > 0:
+                                    breakdown.append(f"{package_count} actions, {builtin_count} built-in")
+                                elif builtin_count > 0:
+                                    breakdown.append(f"{builtin_count} built-in actions")
+                                else:
+                                    breakdown.append(f"{count} actions")
+                            else:
+                                breakdown.append(f"{count} {key}")
+                    print(f"  Depends: {depends_count} items ({', '.join(breakdown)})")
+                else:
+                    print(f"  Depends: 0 items")
+
+                # Display scan statistics
+                print(f"  Scanned {py_count} .py file(s), {talon_count} .talon file(s)")
+                print()
+            else:
+                # Non-verbose: still show version warnings
+                from diff_utils import status_warning
+                for pkg_name, pkg_info in package_dependencies.items():
                     if pkg_name in scanned_versions and scanned_versions[pkg_name] != pkg_info['min_version']:
                         try:
-                            # Compare versions (works for semver x.y.z format)
                             scanned_parts = [int(x) for x in scanned_versions[pkg_name].split('.')]
                             current_parts = [int(x) for x in pkg_info['min_version'].split('.')]
-                            if scanned_parts > current_parts:
-                                base_info += f" (workspace has {scanned_versions[pkg_name]})"
-                            elif scanned_parts < current_parts:
-                                base_info += f" WARNING: workspace has older version {scanned_versions[pkg_name]}"
+                            if scanned_parts < current_parts:
+                                print(status_warning(f"WARNING: {pkg_name} workspace has older version {scanned_versions[pkg_name]} (requires {pkg_info['min_version']}+)"))
                         except (ValueError, AttributeError):
-                            # If version parsing fails, just show current version
                             pass
-
-                    print(base_info)
-                print()
-            elif dev_deps_found:
-                print(f"Package dependencies (covered by devDependencies):")
-                for pkg_name in dev_deps_found:
-                    dev_dep_info = existing_dev_deps[pkg_name]
-                    version = dev_dep_info.get('min_version', 'unknown') if isinstance(dev_dep_info, dict) else dev_dep_info
-                    print(f"  - {pkg_name} ({version}) [devDependency]")
-                print()
-            else:
-                print(f"No package dependencies\n")
-
-            # Show contributes breakdown
-            if contributes_count > 0:
-                breakdown = []
-                for key in ENTITIES:
-                    count = len(getattr(new_entity_data.contributes, key))
-                    if count > 0:
-                        breakdown.append(f"{count} {key}")
-                print(f"  Contributes: {contributes_count} items ({', '.join(breakdown)})")
-            else:
-                print(f"  Contributes: 0 items")
-
-            # Show depends breakdown
-            if depends_count > 0:
-                breakdown = []
-                for key in ENTITIES:
-                    count = len(getattr(new_entity_data.depends, key))
-                    if count > 0:
-                        if key == "actions":
-                            # Split actions into package and built-in
-                            all_actions = getattr(new_entity_data.depends, key)
-                            builtin_count = sum(1 for action in all_actions if is_builtin_action(action))
-                            package_count = count - builtin_count
-                            if package_count > 0 and builtin_count > 0:
-                                breakdown.append(f"{package_count} actions, {builtin_count} built-in")
-                            elif builtin_count > 0:
-                                breakdown.append(f"{builtin_count} built-in actions")
-                            else:
-                                breakdown.append(f"{count} actions")
-                        else:
-                            breakdown.append(f"{count} {key}")
-                print(f"  Depends: {depends_count} items ({', '.join(breakdown)})")
-            else:
-                print(f"  Depends: 0 items")
-
-            # Display scan statistics
-            print(f"  Scanned {py_count} .py file(s), {talon_count} .talon file(s)")
-            print()
 
             # Auto-detect requirements (parrot, gamepad, streamDeck, webcam, eyeTracker, talonBeta)
             requires_set = set(new_entity_data.requires)
@@ -1248,22 +1271,26 @@ def create_or_update_manifest(skip_version_errors: bool = False, dry_run: bool =
             # Auto-detect preview image if preview field is empty
             preview_value = existing_manifest_data.get("preview", "")
             if not preview_value:
-                # Check for common image formats
-                for ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']:
-                    preview_path = os.path.join(full_package_dir, f"preview{ext}")
-                    if os.path.exists(preview_path):
+                # Check for any file named "preview" with image extension
+                exclude_ext = {'.talon', '.py', '.md', '.txt', '.json', '.yaml', '.yml'}
+                for file in os.listdir(full_package_dir):
+                    if file.startswith("preview."):
+                        ext = os.path.splitext(file)[1].lower()
+                        if ext in exclude_ext:
+                            continue
                         github_url = existing_manifest_data.get("github", "")
                         if github_url:
                             # Convert github.com URL to raw.githubusercontent.com URL for preview image
-                            preview_value = github_url.replace("github.com", "raw.githubusercontent.com").rstrip('/') + f"/main/preview{ext}"
-                            print(f"Detected preview image: preview{ext}\n")
+                            preview_value = github_url.replace("github.com", "raw.githubusercontent.com").rstrip('/') + f"/main/{file}"
+                            if verbose:
+                                print(f"Detected preview image: {file}\n")
                         break
 
             if "license" in existing_manifest_data:
                 license_value = existing_manifest_data["license"]
             else:
                 license_value = detect_license(full_package_dir)
-                if license_value:
+                if license_value and verbose:
                     print(f"Detected license: {license_value}\n")
 
             new_manifest_data = {
@@ -1329,19 +1356,55 @@ def create_or_update_manifest(skip_version_errors: bool = False, dry_run: bool =
 
             new_manifest_data = prune_manifest_data(new_manifest_data)
 
+            # Generate JSON strings for comparison
+            new_manifest_json = json.dumps(new_manifest_data, indent=2, ensure_ascii=False)
+            old_manifest_json = json.dumps(existing_manifest_data, indent=2, ensure_ascii=False) if existing_manifest_data else ""
+
             if dry_run:
-                # Output JSON to console instead of writing file
-                print(f"\n{'='*60}")
-                print(f"Generated manifest (not saved):")
-                print(f"{'='*60}\n")
-                print(json.dumps(new_manifest_data, indent=2, ensure_ascii=False))
+                # Show diff without writing
+                from diff_utils import diff_json, format_diff_output, status_no_change, status_created, DIM, RESET
+
+                has_changes, diff_output = diff_json(old_manifest_json, new_manifest_json, "manifest.json")
+
+                if is_new_manifest:
+                    print(status_created("manifest.json") + f" {DIM}(dry run){RESET}")
+                    # Show full content as diff (all + lines)
+                    _, new_diff = diff_json("", new_manifest_json, "manifest.json")
+                    print(format_diff_output(new_diff))
+                elif has_changes:
+                    print(f"manifest.json: {DIM}(dry run){RESET}")
+                    print(format_diff_output(diff_output))
+                else:
+                    print(status_no_change("manifest.json"))
+
+                # Write to temp manifest path for other generators to use in dry-run mode
+                if output_manifest_path:
+                    with open(output_manifest_path, 'w', encoding='utf-8') as f:
+                        f.write(new_manifest_json)
             else:
-                update_manifest(full_package_dir, new_manifest_data)
-                manifest_path = os.path.join(relative_dir, 'manifest.json').replace('\\', '/')
-                print(f"Manifest updated: {manifest_path}")
+                # Compare old vs new and show diff or "no changes"
+                from diff_utils import diff_json, format_diff_output, status_no_change, status_created
+
+                has_changes, diff_output = diff_json(old_manifest_json, new_manifest_json, "manifest.json")
+
+                if is_new_manifest:
+                    # New manifest - always write and show creation message
+                    update_manifest(full_package_dir, new_manifest_data)
+                    print(status_created("manifest.json"))
+                    # Show full content as diff (all + lines)
+                    _, new_diff = diff_json("", new_manifest_json, "manifest.json")
+                    print(format_diff_output(new_diff))
+                elif has_changes:
+                    # Existing manifest with changes - show diff and write
+                    update_manifest(full_package_dir, new_manifest_data)
+                    print(f"manifest.json:")
+                    print(format_diff_output(diff_output))
+                else:
+                    # No changes
+                    print(status_no_change("manifest.json"))
 
             # Add separator if there are more packages to process
-            if idx < len(CREATE_MANIFEST_DIRS) - 1:
+            if verbose and idx < len(CREATE_MANIFEST_DIRS) - 1:
                 print()
 
             # Check if _version.py needs updating
@@ -1368,23 +1431,34 @@ def create_or_update_manifest(skip_version_errors: bool = False, dry_run: bool =
                                     should_warn = True
 
                                 if should_warn:
+                                    from diff_utils import YELLOW, RESET
                                     rel_path = os.path.relpath(full_package_dir)
-                                    print(f"WARNING: _version.py is outdated (v{existing_version}, current: v{current_version})")
-                                    print(f"  Run: py generate_version.py {rel_path}")
+                                    print(f"{YELLOW}WARNING: _version.py is outdated (v{existing_version}, current: v{current_version}){RESET}")
+                                    print(f"{YELLOW}  Run: py generate_version.py {rel_path}{RESET}")
                 except:
                     pass
 
     # Print summary
     if total_warnings > 0 or total_errors > 0:
+        from diff_utils import YELLOW, RED, RESET
         print(f"\n{'='*60}")
         print("Summary:")
         if total_warnings > 0:
-            print(f"  {total_warnings} warning(s)")
+            print(f"  {YELLOW}{total_warnings} warning(s){RESET}")
         if total_errors > 0:
-            print(f"  {total_errors} error(s)")
+            print(f"  {RED}{total_errors} error(s){RESET}")
         print(f"{'='*60}")
 
 if __name__ == "__main__":
     skip_version_errors = "--skip-version-check" in sys.argv
     dry_run = "--dry-run" in sys.argv
-    create_or_update_manifest(skip_version_errors, dry_run)
+    verbose = "--verbose" in sys.argv or "-v" in sys.argv
+
+    # Get output manifest path for dry-run mode (allows other generators to use the mock manifest)
+    output_manifest_path = None
+    for i, arg in enumerate(sys.argv):
+        if arg == "--output-manifest-path" and i + 1 < len(sys.argv):
+            output_manifest_path = sys.argv[i + 1]
+            break
+
+    create_or_update_manifest(skip_version_errors, dry_run, verbose, output_manifest_path)
