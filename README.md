@@ -93,21 +93,22 @@ source ~/.bashrc   # or ~/.zshrc
 . $PROFILE
 ```
 
-**4. Run tpack:**
+**4. Try it out:**
 
 ```bash
-cd [TALON_HOME]/user/any_folder
-tpack              # Update manifest, _version, and readme
-tpack info         # List contributions, dependencies, and info
-tpack --dry-run    # Preview changes without writing files
-tpack --help       # Show all options
-
-# Or specify a path
-tpack some_folder
-tpack info some_folder
+tpack info some_folder       # See what a folder contributes
+tpack --dry-run some_folder  # Preview changes without writing
 ```
 
-🎉 Done! Try `tpack info some_folder` or `tpack --dry-run some_folder` first to preview, then run `tpack some_folder` when ready.
+**5. Run it on your repo:**
+
+```bash
+tpack my_repo
+```
+
+🎉 Done! Keep your manifest up to date by running `tpack` whenever you make changes.
+
+Having issues? See [Troubleshooting](#troubleshooting).
 
 ## Version Bumping
 
