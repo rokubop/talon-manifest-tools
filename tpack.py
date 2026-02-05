@@ -4,7 +4,7 @@ Will update instead of overwriting existing code where relevant.
 
 Usage:
   tpack [directory]              Update manifest, _version, and readme
-  tpack info [dir]               Show info about a directory
+  tpack info [dir]               List contributions, dependencies, and info
   tpack version patch [dir]      Bump patch version (1.0.0 -> 1.0.1)
   tpack version minor [dir]      Bump minor version (1.0.0 -> 1.1.0)
   tpack version major [dir]      Bump major version (1.0.0 -> 2.0.0)

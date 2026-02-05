@@ -10,6 +10,50 @@ Catalogs your Talon repo's contributions and dependencies, generates version val
 
 > **Note:** Unofficial community tool.
 
+## Usage
+
+```bash
+$ tpack                     # update manifest, _version, and readme
+$ tpack info                # list contributions, dependencies, and info
+$ tpack version patch       # bump version (1.0.0 -> 1.0.1)
+```
+
+`tpack info` works on any folder with no setup - use it to quickly see what a repo contributes.
+
+```bash
+$ tpack any_folder/
+
+any_folder/
+manifest.json: created
++  "name": "any_folder",
++  "version": "0.1.0",
++  "contributes": { ... },
++  "depends": { ... },
++  ...
+_version.py: no changes
+README.md: updated
+-  ![Version](https://img.shields.io/badge/version-1.0.0-blue)
++  ![Version](https://img.shields.io/badge/version-0.1.0-blue)
+
+Done.
+```
+
+```bash
+$ tpack info any_folder
+
+any_folder v1.2.0 (stable)
+A toolkit for building Talon interfaces
+https://github.com/user/any_folder
+namespace: user.any_folder
+
+Contributes:
+  actions:
+    user.any_folder_show
+    user.any_folder_hide
+  settings:
+    user.any_folder_enabled
+```
+
 ## Installation
 
 Clone this repo into your Talon directory (either the root or user subdirectory):
@@ -50,21 +94,22 @@ source ~/.bashrc   # or ~/.zshrc
 . $PROFILE
 ```
 
-Then cd to your Talon package folder:
+Then run from within a folder, or specify a path:
 ```bash
-cd [TALON_HOME]/user/my-talon-package
-tpack              # Generate/update manifest, version, and readme files
+cd [TALON_HOME]/user/any_folder
+tpack              # Update manifest, _version, and readme
+tpack info         # List contributions, dependencies, and info
 tpack --dry-run    # Preview changes without writing files
 tpack --help       # Show all options
+
+# Or specify a path
+tpack some_folder
+tpack info some_folder
 ```
 
-## Package Info
+Run `tpack` to keep your manifest up to date.
 
-View a summary of your package:
-
-```bash
-tpack info
-```
+`tpack info` works on any folder - no setup needed. Use it to quickly see what a repo contributes without creating any files.
 
 ## Version Bumping
 
