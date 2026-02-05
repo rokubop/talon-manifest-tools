@@ -54,9 +54,11 @@ Contributes:
     user.any_folder_enabled
 ```
 
-## Installation
+## Getting Started
 
-Clone this repo into your Talon directory (either the root or user subdirectory):
+> **Requires Python 3.12+**. If you get a version error, see [Troubleshooting](#troubleshooting) to use Talon's bundled Python.
+
+**1. Clone into your Talon directory:**
 
 ```sh
 # mac and linux
@@ -68,11 +70,7 @@ cd ~/AppData/Roaming/talon
 git clone https://github.com/rokubop/talon-pack
 ```
 
-## Quick Start
-
-> **Requires Python 3.12+**. If you get a version error, see [Troubleshooting](#troubleshooting) to use Talon's bundled Python.
-
-Set up an alias to run from any directory:
+**2. Set up an alias:**
 
 ```bash
 # Bash/Zsh (Mac/Linux) - add to ~/.bashrc or ~/.zshrc
@@ -85,7 +83,8 @@ alias tpack="py ~/AppData/Roaming/talon/talon-pack/tpack.py"
 function tpack { py "$env:APPDATA\talon\talon-pack\tpack.py" @args }
 ```
 
-After adding the alias, reload your shell:
+**3. Reload your shell:**
+
 ```bash
 # Bash/Zsh (Mac/Linux/Windows)
 source ~/.bashrc   # or ~/.zshrc
@@ -94,7 +93,8 @@ source ~/.bashrc   # or ~/.zshrc
 . $PROFILE
 ```
 
-Then run from within a folder, or specify a path:
+**4. Run tpack:**
+
 ```bash
 cd [TALON_HOME]/user/any_folder
 tpack              # Update manifest, _version, and readme
@@ -107,9 +107,7 @@ tpack some_folder
 tpack info some_folder
 ```
 
-Run `tpack` to keep your manifest up to date.
-
-`tpack info` works on any folder - no setup needed. Use it to quickly see what a repo contributes without creating any files.
+🎉 Done! Try `tpack info some_folder` or `tpack --dry-run some_folder` first to preview, then run `tpack some_folder` when ready.
 
 ## Version Bumping
 
